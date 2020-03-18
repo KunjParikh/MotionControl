@@ -59,3 +59,5 @@ q = phi @ r
 dq = np.zeros((numSensors, 2))
 u_r = np.zeros((numSensors, 2))
 vel_q = np.zeros((numSensors, 2))
+
+print("This is a test")
