@@ -2,8 +2,10 @@ import numpy as np
 from numpy.linalg import norm
 from math import cos, sin, atan2
 import matplotlib.pyplot as plt
-from kalmanFilter import kalmanFilter
+#from kalmanFilter import kalmanFilter
 import params
+
+
 
 def formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, i,rotateRight, rotateLeft, mu_f, z_desired, K4, dt):
 
@@ -38,25 +40,31 @@ def formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, i,rotateRight, rotateLeft
 
 
 if __name__ == "__main__":
-    r_c, r_c_old, f, dz_f, x_2, y_2 = params.r_c, params.r_c, params.f, params.dz_f, 0, 0
-    hessian = params.hessian
+  params = params.Params()
+  for f, dz_f, hessian, z_desired, g, plot_desired in zip(params.f_list,
+                                                      params.dz_f_list,
+                                                      params.hessian_list,
+                                                      params.z_desired_list,
+                                                      params.g_list,
+                                                      params.plot_desired_list): 
+    r_c, r_c_old, x_2, y_2 = params.r_c, params.r_c, 0, 0
     r_c_plot = [r_c]
     for i in range(10000):
         #Decoupled: Ideal test.
         z_c = f(r_c[0], r_c[1])
         dz_c = dz_f(r_c[0], r_c[1])
-
-        r_c, x_2, y_2, hessian = formationCenter(r_c, z_c, dz_c, hessian,  x_2, y_2, i,
+        _hessian = hessian(r_c[0], r_c[1])
+        r_c, x_2, y_2, tmp = formationCenter(r_c, z_c, dz_c, _hessian,  x_2, y_2, i,
                           params.rotateRight, params.rotateLeft,
-                          params.mu_f, params.z_desired,
+                          params.mu_f, z_desired,
                           params.K4, params.dt)
         r_c_plot.append(r_c)
 
     x = np.linspace(-10, 10, 200)
     y = np.linspace(-10, 10, 200)
-    z = params.g(x[:,None], y[None,:])
+    z = g(x[:,None], y[None,:])
 
-    plt.contour(x, y, z, [16])
+    plt.contour(x, y, z, [plot_desired])
     plt.plot(*zip(*r_c_plot), 'b')
     plt.show()
 

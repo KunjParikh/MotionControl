@@ -28,6 +28,7 @@ def formationControl(r_c, r, q, dq, u_r, vel_q, a, b, dt, K2, K3, phi_inv):
 #
 
 if __name__ == "__main__":
+    params = params.Params()
     r_c, r, q, dq, u_r, vel_q = params.r_c, params.r, params.q, \
                                 params.dq, params.u_r, params.vel_q
 
