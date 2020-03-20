@@ -1,5 +1,5 @@
 # LSTM for international airline passengers problem with regression framing
-import numpy
+import numpy as np
 import matplotlib.pyplot as plt
 from pandas import read_csv
 import math
@@ -11,10 +11,13 @@ from sklearn.metrics import mean_squared_error
 import pickle
 from keras.callbacks import EarlyStopping
 from keras.callbacks import ModelCheckpoint
+import os
+#Comment this to use GPU. But looks like for me CPU (~10s) is faster than GPU (~80s).
+os.environ["CUDA_VISIBLE_DEVICES"]="-1"
 
 def train_lstm(dataset, name):
   # fix random seed for reproducibility
-  numpy.random.seed(7)
+  np.random.seed(7)
   # load the dataset
   #dataset =  df_state.to_numpy()
   d_shape = dataset.shape
@@ -31,8 +34,8 @@ def train_lstm(dataset, name):
   trainX, trainY = train[:,0:nfeatures], train[:,nfeatures:]
   testX, testY = test[:, 0:nfeatures], test[:,nfeatures:]
   # reshape input to be [samples, time steps, features]
-  trainX = numpy.reshape(trainX, (trainX.shape[0], 1, trainX.shape[1]))
-  testX = numpy.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
+  trainX = np.reshape(trainX, (trainX.shape[0], 1, trainX.shape[1]))
+  testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
 
   # create and fit the LSTM network
   model = Sequential()
@@ -63,5 +66,5 @@ def train_lstm(dataset, name):
 if True or __name__ == "__main__":
     df_error = pickle.load( open( 'df_error.p', 'rb'))
     df_state = pickle.load( open( 'df_state.p', 'rb'))
-    train_lstm(df_state.to_numpy(), 'state') 
+    train_lstm(df_state.to_numpy(), 'state')
     train_lstm(df_error.to_numpy(), 'error')
