@@ -11,13 +11,7 @@ import pickle
 
 if True or __name__ == "__main__":
     params = params.Params()
-    for f, dz_f, hessian_f, z_desired, g, plot_desired in zip(params.f_list,
-                                                            params.dz_f_list,
-                                                            params.hessian_list,
-                                                            params.z_desired_list,
-                                                            params.g_list,
-                                                            params.plot_desired_list):                                                  
-
+    for function in params.functions:
       r_c, r_c_old, r, = params.r_c, params.r_c, params.r
       #f, dz_f = params.f, params.dz_f
       x_2, y_2 = 0, 0  # Ignored in formationCenter for i == 0
@@ -26,10 +20,10 @@ if True or __name__ == "__main__":
       numSensors = params.numSensors
       p = np.zeros((3, 3))
       #hessian = params.hessian
-      z_c = f(r_c[0], r_c[1])
-      dz_c = dz_f(r_c[0], r_c[1])
-      hessian = hessian_f(r_c[0], r_c[1])
-      z_r = np.array([f(*pt) for pt in r])
+      z_c = function.f(r_c[0], r_c[1])
+      dz_c = function.dz_f(r_c[0], r_c[1])
+      hessian = function.hessian_f(r_c[0], r_c[1])
+      z_r = np.array([function.f(*pt) for pt in r])
 
       r_c_plot = [r_c]
       r_plot = [r]
@@ -40,9 +34,9 @@ if True or __name__ == "__main__":
       df_error = pd.DataFrame()
 
       for i in range(10000):
-          z_r = np.array([f(*pt) for pt in r])
+          z_r = np.array([function.f(*pt) for pt in r])
           #hessian = np.random.rand(2, 2) * 20
-          hessian = hessian_f(r_c[0], r_c[1])
+          hessian = function.hessian_f(r_c[0], r_c[1])
 
           ##Kalman filter: z_c, dz_c, p = kalmanFilter(z_c, dz_c, r, z_r, r_c, r_c_old, p, hessian, numSensors, df_state, df_error)
           #def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian, numSensors):
@@ -58,7 +52,7 @@ if True or __name__ == "__main__":
               0,
               *(hessian @ (r_c - r_c_old))  # 2x2 . 2x1 = 2x1
           ])  # 3x1
-          hc = np.array([hessian[0, 0], hessian[1, 0], hessian[0, 1], hessian[1, 1]])  # 4x1
+          hc = np.array([hessian[0][0], hessian[1][0], hessian[0][1], hessian[1][1]])  # 4x1
           c = np.hstack((np.ones((numSensors, 1)), r - r_c))  # 4x3
           d = 0.5 * np.vstack([np.kron(pt - r_c, pt - r_c) for pt in r])  # 4x4
 
@@ -102,7 +96,7 @@ if True or __name__ == "__main__":
           r_c_old = r_c
           r_c, x_2, y_2, hessian = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, i,
                                                   params.rotateRight, params.rotateLeft,
-                                                  params.mu_f, z_desired,
+                                                  function.mu_f, function.z_desired,
                                                   params.K4, params.dt)
 
           r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q, params.a, params.b,
@@ -111,15 +105,18 @@ if True or __name__ == "__main__":
           if i % 150 == 0:
               r_plot.append(r)
 
+
       x = np.linspace(-10, 10, 200)
       y = np.linspace(-10, 10, 200)
-      z = g(x[:, None], y[None, :])
+      X, Y = np.meshgrid(x, y)
+      Z = function.f(X, Y)
 
-      plt.contour(x, y, z, [plot_desired])
+      plt.contour(x, y, Z, [function.z_desired])
       plt.plot(*zip(*r_c_plot), 'b')
       for r in r_plot:
           plt.plot([r[0, 0], r[1, 0]], [r[0, 1], r[1, 1]], 'yo-')
           plt.plot([r[2, 0], r[3, 0]], [r[2, 1], r[3, 1]], 'go-')
+      plt.title(function.name)
       plt.show()
 
       plt.plot(p_det)
