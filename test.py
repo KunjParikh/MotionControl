@@ -165,3 +165,4 @@ if True or __name__ == "__main__":
             plt.plot([r[2, 0], r[3, 0]], [r[2, 1], r[3, 1]], 'go-')
         plt.title(function.name)
         plt.savefig("{}.pdf".format(function.name), bbox_inches='tight')
+        plt.close()
