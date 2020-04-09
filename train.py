@@ -13,7 +13,8 @@ from keras.callbacks import ModelCheckpoint
 import os
 import pandas as pd
 #Comment this to use GPU. But looks like for me CPU (~10s) is faster than GPU (~80s).
-os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+#os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+rootpath = "/tmp"
 
 def train_lstm(dataset, name, model=False):
   # fix random seed for reproducibility
@@ -44,7 +45,8 @@ def train_lstm(dataset, name, model=False):
     model.compile(loss='mean_squared_error', optimizer='adam')
 
   es = EarlyStopping(monitor='loss', mode='min', verbose=1, patience=5)
-  mc = ModelCheckpoint("model_{}.h5".format(name), monitor='loss', mode='min', verbose=1, save_best_only=True)
+  mc = ModelCheckpoint(os.path.join(rootpath, "model_{}.h5".format(name)), 
+         monitor='loss', mode='min', verbose=1, save_best_only=True)
   history = model.fit(trainX, trainY, epochs=100, batch_size=1, verbose=2, callbacks=[es, mc])
 
   # make predictions
@@ -70,6 +72,7 @@ if __name__ == "__main__":
     model = False
     scaler = pd.Series(dtype='object')
     for name, value in df_state.items():
+      print("Training State for {} shape".format(name))
       s, model = train_lstm(value.to_numpy(), 'state', model)
       scaler = scaler.append(pd.Series({name: s}))
     pickle.dump(scaler, open("scaler_state.p", "wb"))
@@ -77,6 +80,7 @@ if __name__ == "__main__":
     model = False
     scaler = pd.Series(dtype='object')
     for name, value in df_error.items():
+      print("Training Error for {} shape".format(name))
       s, model = train_lstm(value.to_numpy(), 'error', model)
       scaler = scaler.append(pd.Series({name: s}))
     pickle.dump(scaler, open("scaler_error.p", "wb"))
