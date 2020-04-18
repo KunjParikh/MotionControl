@@ -1,13 +1,14 @@
-from pandas import Series
-
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import params
 from formationCenter import formationCenter
 from formationControl import formationControl
 # from kalmanFilter import kalmanFilter
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 import pickle
+from pandas import Series
 
 # !ls '/content/drive/My Drive/SJSU/Final Project/model_state.h5'
 
@@ -114,7 +115,8 @@ if True or __name__ == "__main__":
             plt.plot([r[0, 0], r[1, 0]], [r[0, 1], r[1, 1]], 'yo-')
         plt.plot([r[2, 0], r[3, 0]], [r[2, 1], r[3, 1]], 'go-')
         plt.title(function.name)
-        plt.show()
+        plt.savefig("{}_kalmanFilter.pdf".format(function.name), bbox_inches='tight')
+        plt.close()
 
         # plt.plot(p_det)
         # plt.show()
