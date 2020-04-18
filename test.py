@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 import pickle
 # from kalmanFilter import kalmanFilter
 import numpy as np
@@ -7,12 +9,10 @@ import params
 from formationCenter import formationCenter
 from formationControl import formationControl
 import os
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 # Comment this to use GPU. But looks like for me CPU (~10s) is faster than GPU (~80s).
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 if True or __name__ == "__main__":
     params = params.Params()
