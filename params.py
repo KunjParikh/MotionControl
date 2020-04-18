@@ -74,16 +74,24 @@ class Params:
                 0.1
             ),
 
-            Function("rhombus",
-                     np.vectorize(lambda x, y: abs(x) + abs(y)),
-                     lambda x, y: [np.sign(x), np.sign(y)],
-                     lambda x, y: [[1, 0], [0, 1]],
-                     6,
-                     100
-                     )
+            # Function("rhombus",
+            #          np.vectorize(lambda x, y: abs(x) + abs(y)),
+            #          lambda x, y: [np.sign(x), np.sign(y)],
+            #          lambda x, y: [[1, 0], [0, 1]],
+            #          6,
+            #          100
+            #          )
+
         ]
 
         # self.functions = [
+        #     Function("circle_4",
+        #              np.vectorize(lambda x, y: (x ** 4) + (y ** 4)),
+        #              lambda x, y: [4 * (x ** 3), 4 * (y ** 3)],
+        #              lambda x, y: [[12 * (x ** 2), 0], [0, 12 * (y ** 2)]],
+        #              32,
+        #              0.1
+        #              )
         # ]
 
         # Parameters - Formation Control

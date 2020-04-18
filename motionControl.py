@@ -126,3 +126,10 @@ if True or __name__ == "__main__":
 
     pickle.dump(series_data, open("df_state.p", "wb"))
     pickle.dump(series_error, open("df_error.p", "wb"))
+
+    # Sample code explaining the format of df_state data-structure
+    # import pickle as pk
+    # x = pk.load(open("C:\\Users\\KunjJParikh\\PycharmProjects\\MotionControl\\df_state.p", 'rb'))
+    # for name, value in x.items():
+    #     print(name)
+    # #print(x['rhombus'])

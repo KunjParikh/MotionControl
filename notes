@@ -1,0 +1,9 @@
+1) Hessian Estimation
+2) MakeFile for sbatch
+3) reset states before each new LSTM training
+4) Add error metric to test.
+ - Thought of area inside curve using green's algorithm > Curve is cycled multiple times in 10000 steps so overcount.
+ > Implemented using z_desired vs measured value at all points, and mean squared error.
+   - Have to truncate initial points when we are still approaching the curve. For now filtering out initial points until we are 1.1 (10% of z_desired).
+5) Test on something not trained
+

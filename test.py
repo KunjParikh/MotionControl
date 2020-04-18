@@ -1,17 +1,18 @@
-import math
 import pickle
-
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 # from kalmanFilter import kalmanFilter
 import numpy as np
 from keras.models import load_model
 from sklearn.metrics import mean_squared_error
-
 import params
 from formationCenter import formationCenter
 from formationControl import formationControl
+import os
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+# Comment this to use GPU. But looks like for me CPU (~10s) is faster than GPU (~80s).
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 if True or __name__ == "__main__":
     params = params.Params()
@@ -57,7 +58,7 @@ if True or __name__ == "__main__":
         stateY = df_state[function.name].iloc[:, 3:].to_numpy()
         stateY = scaler_state[function.name].transform(np.hstack((np.zeros((10000, 3)), stateY)))[:, 3:]
 
-        print(math.sqrt(mean_squared_error(stateY, state_predict)))
+        # print(math.sqrt(mean_squared_error(stateY, state_predict)))
 
         errorX = df_error[function.name].iloc[:, 0:9].to_numpy()
 
@@ -68,7 +69,7 @@ if True or __name__ == "__main__":
         errorY = df_error[function.name].iloc[:, 9:].to_numpy()
         errorY = scaler_error[function.name].transform(np.hstack((np.zeros((10000, 9)), errorY)))[:, 9:]
 
-        print(math.sqrt(mean_squared_error(errorY, error_predict)))
+        # print(math.sqrt(mean_squared_error(errorY, error_predict)))
 
         for i in range(10000):
             z_r = np.array([function.f(*pt) for pt in r])
@@ -158,11 +159,28 @@ if True or __name__ == "__main__":
         X, Y = np.meshgrid(x, y)
         Z = function.f(X, Y)
 
-        plt.contour(x, y, Z, [function.z_desired])
+        cs = plt.contour(x, y, Z, [function.z_desired])
         plt.plot(*zip(*r_c_plot), 'b')
         for r in r_plot:
-            plt.plot([r[0, 0], r[1, 0]], [r[0, 1], r[1, 1]], 'yo-')
-            plt.plot([r[2, 0], r[3, 0]], [r[2, 1], r[3, 1]], 'go-')
+            plt.plot([r[0, 0], r[2, 0]], [r[0, 1], r[2, 1]], 'yo-', linewidth=4)
+            plt.plot([r[0, 0], r[3, 0]], [r[0, 1], r[3, 1]], 'yo-', linewidth=4)
+            plt.plot([r[1, 0], r[2, 0]], [r[1, 1], r[2, 1]], 'yo-', linewidth=4)
+            plt.plot([r[1, 0], r[3, 0]], [r[1, 1], r[3, 1]], 'yo-', linewidth=4)
         plt.title(function.name)
         plt.savefig("{}.pdf".format(function.name), bbox_inches='tight')
         plt.close()
+
+        # Estimate error by measuring field value on predicted trajectory, and comparing to desired field value
+        tracedValues = []
+        # Need to filter out values where we are still approaching the curve.
+        onCurve = False
+        for value in map(lambda pt: function.f(pt[0], pt[1]), r_c_plot):
+            if onCurve:
+                tracedValues.append(value)
+            elif value < 1.1 * function.z_desired:
+                onCurve = True
+            else:
+                pass
+        desiredValue = np.full(len(tracedValues), function.z_desired)
+        print("Traced value error for function {} = {}".format(function.name,
+                                                               mean_squared_error(desiredValue, tracedValues)))
