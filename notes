@@ -8,6 +8,10 @@
     > Implemented using z_desired vs measured value at all points, and mean squared error.
         - Have to truncate initial points when we are still approaching the curve. For now filtering out initial points until we are 1.1 (10% of z_desired).
 5) Test on something not trained
+    - Works for circle. Need to generalize
+    - Updated scaler to only fit on training data, and not on test. This is making the results worse.
+    - Try individual scaling to -1, +1. Even for test.... can't do this for test, as we have not seen the whole shape yet.
+    > Train by scaling each function individually. For test we have no choice but to use one of the function's scaler.
 
 6) Analyze State-full-ness. https://machinelearningmastery.com/stateful-stateless-lstm-time-series-forecasting-python/
     stateful default is False, shuffle default is True, default batch_size = 32 (32 samples in a batch!).
@@ -60,3 +64,4 @@
     Need to investigate more. See stochastic gradient descend vs batch gradient descent
     > Batch_size = 25, epochs = 200, patience = 20 seems to work.
 
+13) Add cross-validation

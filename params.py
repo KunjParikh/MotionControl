@@ -17,13 +17,13 @@ class Params:
         # Globals - Function definition
 
         self.functions = [
-            Function("circle",
-                     np.vectorize(lambda x, y: (x ** 2) + (y ** 2)),
-                     lambda x, y: [2 * (x ** 1), 2 * (y ** 1)],
-                     lambda x, y: [[2, 0], [0, 2]],
-                     16,
-                     10
-                     ),
+            # Function("circle",
+            #          np.vectorize(lambda x, y: (x ** 2) + (y ** 2)),
+            #          lambda x, y: [2 * (x ** 1), 2 * (y ** 1)],
+            #          lambda x, y: [[2, 0], [0, 2]],
+            #          16,
+            #          10
+            #          ),
 
             Function("circle_4",
                      np.vectorize(lambda x, y: (x ** 4) + (y ** 4)),
@@ -74,25 +74,26 @@ class Params:
                 0.1
             ),
 
-            # Function("rhombus",
-            #          np.vectorize(lambda x, y: abs(x) + abs(y)),
-            #          lambda x, y: [np.sign(x), np.sign(y)],
-            #          lambda x, y: [[1, 0], [0, 1]],
-            #          6,
-            #          100
-            #          )
+            Function("rhombus",
+                     np.vectorize(lambda x, y: abs(x) + abs(y)),
+                     lambda x, y: [np.sign(x), np.sign(y)],
+                     lambda x, y: [[1, 0], [0, 1]],
+                     6,
+                     100
+                     )
 
         ]
 
-        # self.functions = [
-        #     Function("circle_4",
-        #              np.vectorize(lambda x, y: (x ** 4) + (y ** 4)),
-        #              lambda x, y: [4 * (x ** 3), 4 * (y ** 3)],
-        #              lambda x, y: [[12 * (x ** 2), 0], [0, 12 * (y ** 2)]],
-        #              32,
-        #              0.1
-        #              )
-        # ]
+        self.test_functions = [
+          Function("circle",
+                   np.vectorize(lambda x, y: (x ** 2) + (y ** 2)),
+                   lambda x, y: [2 * (x ** 1), 2 * (y ** 1)],
+                   lambda x, y: [[2, 0], [0, 2]],
+                   16,
+                   10
+                   )
+        ]
+        #self.test_functions = self.functions
 
         # Parameters - Formation Control
         self.numSensors = 4

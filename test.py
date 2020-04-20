@@ -15,7 +15,7 @@ from keras.layers import Dense
 from keras.layers import LSTM
 
 # Comment this to use GPU. But looks like for me CPU (~10s) is faster than GPU (~80s).
-# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 if True or __name__ == "__main__":
     params = params.Params()
@@ -53,7 +53,7 @@ if True or __name__ == "__main__":
     print(model_state.summary())
     print(model_error.summary())
 
-    for function in params.functions:
+    for function in params.test_functions:
         r_c, r_c_old, r, = params.r_c, params.r_c, params.r
         x_2, y_2 = 0, 0  # Ignored in formationCenter for i == 0
         q, dq, u_r, vel_q = params.q, params.dq, params.u_r, params.vel_q
@@ -77,17 +77,17 @@ if True or __name__ == "__main__":
 
         stateX = df_state[function.name].iloc[:, 0:3].to_numpy()
 
-        state = scaler_state[function.name].transform(np.hstack((stateX, np.zeros((10000, 3)))))[:, 0:3]
+        state = scaler_state.transform(np.hstack((stateX, np.zeros((10000, 3)))))[:, 0:3]
         state_predict = model_state.predict(np.reshape(state, (state.shape[0], 1, state.shape[1])), batch_size=batch_size)
-        stateY = df_state[function.name].iloc[:, 3:].to_numpy()
-        stateY = scaler_state[function.name].transform(np.hstack((np.zeros((10000, 3)), stateY)))[:, 3:]
+        # stateY = df_state[function.name].iloc[:, 3:].to_numpy()
+        # stateY = scaler_state[function.name].transform(np.hstack((np.zeros((10000, 3)), stateY)))[:, 3:]
 
         errorX = df_error[function.name].iloc[:, 0:9].to_numpy()
 
-        error = scaler_error[function.name].transform(np.hstack((errorX, np.zeros((10000, 9)))))[:, 0:9]
+        error = scaler_error.transform(np.hstack((errorX, np.zeros((10000, 9)))))[:, 0:9]
         error_predict = model_error.predict(np.reshape(error, (error.shape[0], 1, error.shape[1])), batch_size=batch_size)
-        errorY = df_error[function.name].iloc[:, 9:].to_numpy()
-        errorY = scaler_error[function.name].transform(np.hstack((np.zeros((10000, 9)), errorY)))[:, 9:]
+        # errorY = df_error[function.name].iloc[:, 9:].to_numpy()
+        # errorY = scaler_error[function.name].transform(np.hstack((np.zeros((10000, 9)), errorY)))[:, 9:]
 
         for i in range(10000):
             z_r = np.array([function.f(*pt) for pt in r])
@@ -115,18 +115,18 @@ if True or __name__ == "__main__":
 
             # USING LSTM
             s_e_kalman = a @ s + h  # 3x1
-            state = scaler_state[function.name].transform(np.hstack((s, np.zeros(3))).reshape(1, -1))[:, 0:3]
+            state = scaler_state.transform(np.hstack((s, np.zeros(3))).reshape(1, -1))[:, 0:3]
             state_predict = model_state.predict(np.reshape(state, (state.shape[0], 1, state.shape[1])), batch_size=batch_size)
-            state_predict = scaler_state[function.name].inverse_transform(
+            state_predict = scaler_state.inverse_transform(
                 np.hstack((np.zeros(state_predict.shape), state_predict)))[:, 3:]
             s_e_lstm = state_predict[0]
             s_e = s_e_lstm
 
             p_e_kalman = a @ p @ a.T + m  # 3x3 @ 3x1 @ 3x3 = 3x3
             error = p.flatten()
-            error = scaler_error[function.name].transform(np.hstack((error, np.zeros(9))).reshape(1, -1))[:, 0:9]
+            error = scaler_error.transform(np.hstack((error, np.zeros(9))).reshape(1, -1))[:, 0:9]
             error_predict = model_error.predict(np.reshape(error, (error.shape[0], 1, error.shape[1])), batch_size=batch_size)
-            error_predict = scaler_error[function.name].inverse_transform(
+            error_predict = scaler_error.inverse_transform(
                 np.hstack((np.zeros(error_predict.shape), error_predict)))[:, 9:]
             p_e_lstm = np.reshape(error_predict[0], (3, 3))
             p_e = p_e_lstm
@@ -194,7 +194,7 @@ if True or __name__ == "__main__":
         for value in map(lambda pt: function.f(pt[0], pt[1]), r_c_plot):
             if onCurve:
                 tracedValues.append(value)
-            elif value < 1.1 * function.z_desired:
+            elif value < 1.5 * function.z_desired:
                 onCurve = True
             else:
                 pass
