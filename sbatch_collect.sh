@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#SBATCH --job-nam=motionControl
+#SBATCH --job-nam=motionControl_collect
 #SBATCH --output=motionControl.log
 #
 #SBATCH --cpus-per-task=1
