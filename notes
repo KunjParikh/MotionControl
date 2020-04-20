@@ -1,9 +1,62 @@
 1) Hessian Estimation
 2) MakeFile for sbatch
 3) reset states before each new LSTM training
+    - Maybe train CNN on weights learend by LSTM for each function?
+    > Handled by 7.
 4) Add error metric to test.
- - Thought of area inside curve using green's algorithm > Curve is cycled multiple times in 10000 steps so overcount.
- > Implemented using z_desired vs measured value at all points, and mean squared error.
-   - Have to truncate initial points when we are still approaching the curve. For now filtering out initial points until we are 1.1 (10% of z_desired).
+    - Thought of area inside curve using green's algorithm > Curve is cycled multiple times in 10000 steps so overcount.
+    > Implemented using z_desired vs measured value at all points, and mean squared error.
+        - Have to truncate initial points when we are still approaching the curve. For now filtering out initial points until we are 1.1 (10% of z_desired).
 5) Test on something not trained
+
+6) Analyze State-full-ness. https://machinelearningmastery.com/stateful-stateless-lstm-time-series-forecasting-python/
+    stateful default is False, shuffle default is True, default batch_size = 32 (32 samples in a batch!).
+
+    batch_size = 1, so if stateful=False, state is reset after each batch (of size 1).
+    If stateful= True, state is reset only after each epoch.
+    STATEFUL > (#3)
+        model.add(LSTM(neurons, batch_input_shape=(batch_size, X.shape[1], X.shape[2]), stateful=True))
+        model.add(Dense(1))
+        model.compile(loss='mean_squared_error', optimizer='adam')
+        for i in range(nb_epoch):
+            model.fit(X, y, epochs=1, batch_size=batch_size, verbose=0, shuffle=False)
+            model.reset_states()
+
+    STATELESS > Best (#1)
+        model.add(LSTM(neurons, batch_input_shape=(batch_size, X.shape[1], X.shape[2]), stateful=False))
+        model.add(Dense(1))
+        model.compile(loss='mean_squared_error', optimizer='adam')
+        model.fit(X, y, epochs=nb_epoch, batch_size=batch_size, verbose=0, shuffle=False)
+
+    STATELESS_SHUFFLE > (#2)
+        model.add(LSTM(neurons, batch_input_shape=(batch_size, X.shape[1], X.shape[2]), stateful=False))
+        model.add(Dense(1))
+        model.compile(loss='mean_squared_error', optimizer='adam')
+        model.fit(X, y, epochs=nb_epoch, batch_size=batch_size, verbose=0, shuffle=True)
+
+    If batch_size = 12.
+    STATEFUL and STATELESS behave same, because state reset at the end.
+
+    Decision:
+    I need STATEFUL = True if I want to learn a sequence.
+    I need to reset state after each epoch manually.
+    Maybe increase batch_size to speed up the training from 1 to 32?? >> Statefull means state of 32 will go to 32+, not 33.
+    batch_size of 10 improves runtime of training from 50 mins to 5 mins with acceptable results.
+
+7) Need to remove train-test split from train.py
+    > Done
+
+8) See if we can get 1 or 2 loops for each function instead of 10000 steps.
+
+9) Randomly generate coefficients and more train functions.
+
+10) Fix train.py to take only in functions params instead of all in dataset.
+    > Done
+
+11) Scale from [-1 1] instead of [0 1]
+    > Done for both state and error for now, maybe state should be [0 1]?
+
+12) Batch_size of 10 deteriorates the result for irregular2 curve. 1 gives better result. But small mini-batchs of is supposed to help reduce noise.
+    Need to investigate more. See stochastic gradient descend vs batch gradient descent
+    > Batch_size = 25, epochs = 200, patience = 20 seems to work.
 
