@@ -1,4 +1,7 @@
+MAIN
 1) Hessian Estimation
+    - Limited sensors, noisy.
+
 2) MakeFile for sbatch
 3) reset states before each new LSTM training
     - Maybe train CNN on weights learend by LSTM for each function?
@@ -7,6 +10,7 @@
     - Thought of area inside curve using green's algorithm > Curve is cycled multiple times in 10000 steps so overcount.
     > Implemented using z_desired vs measured value at all points, and mean squared error.
         - Have to truncate initial points when we are still approaching the curve. For now filtering out initial points until we are 1.1 (10% of z_desired).
+    Plot x - y for desired value
 5) Test on something not trained
     - Works for circle. Need to generalize
     - Updated scaler to only fit on training data, and not on test. This is making the results worse.
@@ -51,8 +55,10 @@
     > Done
 
 8) See if we can get 1 or 2 loops for each function instead of 10000 steps.
+    - Threshold based.
 
 9) Randomly generate coefficients and more train functions.
+
 
 10) Fix train.py to take only in functions params instead of all in dataset.
     > Done
@@ -65,3 +71,9 @@
     > Batch_size = 25, epochs = 200, patience = 20 seems to work.
 
 13) Add cross-validation
+
+MAIN
+14) Trained using 100 curves, deploy on unknown field - ideally it should follow curve. But because of large variety,
+    Robot is collecting data + trained model. Online training to improve model. Feedback control.
+    Maybe combine with another model/ reinforcement learning.
+    Maybe use only field value and not gradient. Average. Get error between real value and desired value.
