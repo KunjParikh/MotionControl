@@ -50,10 +50,23 @@ if True or __name__ == "__main__":
     # compile model
     model_error.compile(loss='mean_squared_error', optimizer='adam')
 
+    model_hessian_orig = load_model("hessian.h5")
+    scaler_hessian = pickle.load(open("hessian_scaler.p", "rb"))
+    # re-define model
+    model_hessian = Sequential()
+    model_hessian.add(LSTM(22, batch_input_shape=(batch_size, 1, 21), stateful=True))
+    model_hessian.add(Dense(4))
+    # copy weights
+    old_weights = model_hessian_orig.get_weights()
+    model_hessian.set_weights(old_weights)
+    # compile model
+    model_hessian.compile(loss='mean_squared_error', optimizer='adam')
+
     print(model_state.summary())
     print(model_error.summary())
+    print(model_hessian.summary())
 
-    for function in params.test_functions:
+    for function in params.functions:
         r_c, r_c_old, r, = params.r_c, params.r_c, params.r
         x_2, y_2 = 0, 0  # Ignored in formationCenter for i == 0
         q, dq, u_r, vel_q = params.q, params.dq, params.u_r, params.vel_q
@@ -91,8 +104,8 @@ if True or __name__ == "__main__":
 
         for i in range(10000):
             z_r = np.array([function.f(*pt) for pt in r])
-            hessian = function.hessian_f(r_c[0], r_c[1])
-            # hessian = np.random.rand(2, 2) * 20
+            #hessian = function.hessian_f(r_c[0], r_c[1])
+            #hessian = np.random.rand(2, 2) * 20
 
             # Kalman filter: z_c, dz_c, p = kalmanFilter(z_c, dz_c, r, z_r, r_c, r_c_old,
             #   p, hessian, numSensors, df_state, df_error)
@@ -167,6 +180,11 @@ if True or __name__ == "__main__":
 
             r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q, params.a, params.b,
                                                     params.dt, params.K2, params.K3, params.phi_inv)
+
+            hessian_state = np.concatenate([r_c, [z_c], dz_c, *r, z_r, *hessian])
+            hessian_state = scaler_hessian.transform(hessian_state.reshape(1, -1))
+            hessian = model_hessian.predict(np.reshape(hessian_state, (hessian_state.shape[0], 1, hessian_state.shape[1])),
+                                    batch_size=1)[0].reshape(2, 2)
             r_c_plot.append(r_c)
             if i % 150 == 0:
                 r_plot.append(r)
@@ -179,10 +197,8 @@ if True or __name__ == "__main__":
         cs = plt.contour(x, y, Z, [function.z_desired])
         plt.plot(*zip(*r_c_plot), 'b')
         for r in r_plot:
-            plt.plot([r[0, 0], r[2, 0]], [r[0, 1], r[2, 1]], 'yo-', linewidth=4)
-            plt.plot([r[0, 0], r[3, 0]], [r[0, 1], r[3, 1]], 'yo-', linewidth=4)
-            plt.plot([r[1, 0], r[2, 0]], [r[1, 1], r[2, 1]], 'yo-', linewidth=4)
-            plt.plot([r[1, 0], r[3, 0]], [r[1, 1], r[3, 1]], 'yo-', linewidth=4)
+            plt.plot([r[0, 0], r[1, 0]], [r[0, 1], r[1, 1]], 'yo-')
+            plt.plot([r[2, 0], r[3, 0]], [r[2, 1], r[3, 1]], 'go-')
         plt.title(function.name)
         plt.savefig("{}.pdf".format(function.name), bbox_inches='tight')
         plt.close()
