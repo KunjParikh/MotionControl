@@ -85,7 +85,7 @@ class Params:
         ]
 
         self.test_functions = [
-          Function("circle",
+            Function("circle",
                    np.vectorize(lambda x, y: (x ** 2) + (y ** 2)),
                    lambda x, y: [2 * (x ** 1), 2 * (y ** 1)],
                    lambda x, y: [[2, 0], [0, 2]],
@@ -138,3 +138,6 @@ class Params:
         self.dq = np.zeros((self.numSensors, 2))
         self.u_r = np.zeros((self.numSensors, 2))
         self.vel_q = np.zeros((self.numSensors, 2))
+
+        #LSTM training
+        self.batch_size = 25
