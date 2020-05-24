@@ -1,6 +1,7 @@
 MAIN
 1) Hessian Estimation
     - Limited sensors, noisy.
+    - First pass implemented. Improve results pending.
 
 2) MakeFile for sbatch
 3) reset states before each new LSTM training
@@ -77,3 +78,11 @@ MAIN
     Robot is collecting data + trained model. Online training to improve model. Feedback control.
     Maybe combine with another model/ reinforcement learning.
     Maybe use only field value and not gradient. Average. Get error between real value and desired value.
+
+15) Number of hidden layers = Nh = Ns / (alpha * (Ni + No)); alpha = 2-10, Ni, No = Number of input/output neurons, Ns = Number of samples.
+
+16) Dropout for generalization
+
+17) Debug and fix Elipse.
+
+18) Refactor motionControl code, maybe similar to hessianEstimation?
