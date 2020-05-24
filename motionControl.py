@@ -113,7 +113,7 @@ if True or __name__ == "__main__":
         plt.plot(*zip(*r_c_plot), 'b')
         for r in r_plot:
             plt.plot([r[0, 0], r[1, 0]], [r[0, 1], r[1, 1]], 'yo-')
-        plt.plot([r[2, 0], r[3, 0]], [r[2, 1], r[3, 1]], 'go-')
+            plt.plot([r[2, 0], r[3, 0]], [r[2, 1], r[3, 1]], 'go-')
         plt.title(function.name)
         plt.savefig("{}_kalmanFilter.pdf".format(function.name), bbox_inches='tight')
         plt.close()
