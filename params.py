@@ -17,13 +17,13 @@ class Params:
         # Globals - Function definition
 
         self.functions = [
-            # Function("circle",
-            #          np.vectorize(lambda x, y: (x ** 2) + (y ** 2)),
-            #          lambda x, y: [2 * (x ** 1), 2 * (y ** 1)],
-            #          lambda x, y: [[2, 0], [0, 2]],
-            #          16,
-            #          10
-            #          ),
+            Function("circle",
+                     np.vectorize(lambda x, y: (x ** 2) + (y ** 2)),
+                     lambda x, y: [2 * (x ** 1), 2 * (y ** 1)],
+                     lambda x, y: [[2, 0], [0, 2]],
+                     16,
+                     10
+                     ),
 
             Function("circle_4",
                      np.vectorize(lambda x, y: (x ** 4) + (y ** 4)),
@@ -44,12 +44,10 @@ class Params:
             # np.sqrt can handle array, math.sqrt only works with scalar. > Causes problem with meshgrid and contour
             # plot later.
             Function("elipse",
-                     np.vectorize(lambda x, y: np.sqrt(abs((x ** 2) + (3 * (y ** 2)) + (4 * y) - x - (2 * x * y)))),
-                     lambda x, y: [
-                         ((2 * x) - 1 - (2 * y)) / np.sqrt(abs((x ** 2) + (3 * (y ** 2)) + (4 * y) - x - (2 * x * y))),
-                         ((6 * y) + 4 - (2 * x)) / np.sqrt(abs((x ** 2) + (3 * (y ** 2)) + (4 * y) - x - (2 * x * y)))],
-                     lambda x, y: np.array([[2, 0], [0, 0.5]]),
-                     4,
+                     np.vectorize(lambda x, y: (x ** 2) + (3 * (y ** 2)) + (4 * y) - x - (2 * x * y)),
+                     lambda x, y: [(2 * x) - 1 - (2 * y), (6 * y) + 4 - (2 * x)],
+                     lambda x, y: np.array([[2, -2], [-2, 6]]),
+                     16,
                      10),
 
             Function(
@@ -57,7 +55,8 @@ class Params:
                 np.vectorize(lambda x, y: (x ** 2 + y - 11) ** 2 + (x + y ** 2 - 7) ** 2),
                 lambda x, y: [2 * (x ** 2 + y - 11) * 2 * x + 2 * (x + y ** 2 - 7),
                               2 * (x ** 2 + y - 11) + 2 * (x + y ** 2 - 7) * 2 * y],
-                lambda x, y: np.array([[2, 0], [0, 0.5]]),
+                lambda x, y: np.array([[12 * (x ** 2) + 4 * y - 42, 4 * x + 4 * y],
+                                       [4 * x + 4 * y, 4 * x - 26 + 12 * (y ** 2)]]),
                 144,
                 0.1
             ),
@@ -67,33 +66,21 @@ class Params:
                 np.vectorize(lambda x, y: (x ** 2 + 2 * y - 12) ** 2 + (x + y ** 2 - 17) ** 2),
                 lambda x, y: [(4 * x ** 3 - 46 * x + 8 * x * y + 2 * y ** 2 - 34),
                               (4 * x ** 2 + 4 * x * y - 60 * y + 4 * y ** 3 - 48)],
-                # lambda x, y: np.array([[12 * x ** 2 + 8 * y - 46, 8 * x + 4 * y],
-                #                       [8 * x + 4 * y, 4 * x + 12 * y ** 2 - 60]]),
-                lambda x, y: np.array([[2, 0], [0, 0.5]]),
+                lambda x, y: np.array([[12 * (x ** 2) + 8 * y - 46, 8 * x + 4 * y],
+                                      [8 * x + 4 * y, 4 * x + 12 * (y ** 2) - 60]]),
                 400,
                 0.1
             ),
 
             Function("rhombus",
                      np.vectorize(lambda x, y: abs(x) + abs(y)),
-                     lambda x, y: [np.sign(x), np.sign(y)],
+                     lambda x, y: [np.sign(x), np.sign(y)], #Square cone
                      lambda x, y: [[1, 0], [0, 1]],
                      6,
                      100
                      )
 
         ]
-
-        self.test_functions = [
-            Function("circle",
-                   np.vectorize(lambda x, y: (x ** 2) + (y ** 2)),
-                   lambda x, y: [2 * (x ** 1), 2 * (y ** 1)],
-                   lambda x, y: [[2, 0], [0, 2]],
-                   16,
-                   10
-                   )
-        ]
-        #self.test_functions = self.functions
 
         # Parameters - Formation Control
         self.numSensors = 4

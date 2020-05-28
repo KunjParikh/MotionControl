@@ -28,6 +28,8 @@ if True or __name__ == "__main__":
     df_error = pickle.load(open('df_error.p', 'rb'))
     df_state = pickle.load(open('df_state.p', 'rb'))
 
+
+
     # re-define the batch size
     batch_size = 1
     # re-define model
@@ -66,7 +68,10 @@ if True or __name__ == "__main__":
     print(model_error.summary())
     print(model_hessian.summary())
 
-    for function in params.functions:
+    # testFunctions = [x for x in params.functions if x.name in ['rhombus']]
+    testFunctions = params.functions
+
+    for function in testFunctions:
         r_c, r_c_old, r, = params.r_c, params.r_c, params.r
         x_2, y_2 = 0, 0  # Ignored in formationCenter for i == 0
         q, dq, u_r, vel_q = params.q, params.dq, params.u_r, params.vel_q
@@ -85,8 +90,14 @@ if True or __name__ == "__main__":
 
         keys = list(range(18))
 
+        s_e_kalman_list = []
+        s_e_lstm_list = []
         p_e_kalman_list = []
         p_e_lstm_list = []
+
+        #Rhombus' result improves on rescaling state... a hack.
+        scaler_state.fit(df_state[function.name])
+        scaler_error.fit(df_error[function.name])
 
         stateX = df_state[function.name].iloc[:, 0:3].to_numpy()
 
@@ -134,6 +145,8 @@ if True or __name__ == "__main__":
                 np.hstack((np.zeros(state_predict.shape), state_predict)))[:, 3:]
             s_e_lstm = state_predict[0]
             s_e = s_e_lstm
+            s_e_kalman_list.append(s_e_kalman)
+            s_e_lstm_list.append(s_e_lstm)
 
             p_e_kalman = a @ p @ a.T + m  # 3x3 @ 3x1 @ 3x3 = 3x3
             error = p.flatten()

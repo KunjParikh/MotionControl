@@ -16,23 +16,26 @@ import pandas as pd
 import params as Params
 #Comment this to use GPU. But looks like for me CPU (~10s) is faster than GPU (~80s).
 #os.environ["CUDA_VISIBLE_DEVICES"]="-1"
-rootpath = "/tmp"
+rootpath = ""
 
-def scale_data(dataset):
+def scale_data(dataset, trainFunctions):
     params = Params.Params()
     scaler = MinMaxScaler(feature_range=(-1, 1))
-    training_functions = [function.name for function in params.functions]
+    training_functions = [function.name for function in trainFunctions]
     #fit_data = pd.concat([dataset[name] for name in training_functions])
     #scaler = scaler.fit(fit_data)
     #for name in training_functions:
     #    dataset[name] = pd.DataFrame(scaler.transform(dataset[name]))
+    scaler_return = False
     for name in training_functions:
         scaler = MinMaxScaler(feature_range=(-1, 1))
         # print(dataset[name].describe(include='all'))
         dataset[name] = pd.DataFrame(scaler.fit_transform(dataset[name]))
         # print(dataset[name].describe(include='all'))
-        # The last function's scaler is saved, and will be used by test.
-    return dataset, scaler
+        # Returning ellipse's scaler as it works better than rhombus in general.
+        if name == "elipse":
+            scaler_return = scaler
+    return dataset, scaler_return
 
 def train_lstm(dataset, name, model=False):
     # fix random seed for reproducibility
@@ -85,19 +88,22 @@ def experiment():
     df_state = pickle.load(open('df_state.p', 'rb'))
     model = False
 
-    df_state, scaler_state = scale_data(df_state)
-    df_error, scaler_error = scale_data(df_error)
+    trainFunctions = [x for x in params.functions if x.name not in ['circle_4']]
+    #trainFunctions = [x for x in params.functions if x.name in ['elipse']]
+
+    df_state, scaler_state = scale_data(df_state, trainFunctions)
+    df_error, scaler_error = scale_data(df_error, trainFunctions)
     pickle.dump(scaler_state, open("scaler_state.p", "wb"))
     pickle.dump(scaler_error, open("scaler_error.p", "wb"))
 
-    for function in params.functions:
+    for function in trainFunctions:
         name = function.name
         value = df_state[name]
         print("Training State for {} shape".format(name))
         model = train_lstm(value.to_numpy(), 'state', model)
 
     model = False
-    for function in params.functions:
+    for function in trainFunctions:
         name = function.name
         value = df_error[name]
         print("Training Error for {} shape".format(name))

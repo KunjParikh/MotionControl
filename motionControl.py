@@ -16,7 +16,9 @@ if True or __name__ == "__main__":
     params = params.Params()
     series_data = pd.Series(dtype='object')
     series_error: Series = pd.Series(dtype='object')
-    for function in params.functions:
+    allFunctions = params.functions
+    for function in allFunctions:
+        print("Collecting data for {}".format(function.name))
         r_c, r_c_old, r, = params.r_c, params.r_c, params.r
         x_2, y_2 = 0, 0  # Ignored in formationCenter for i == 0
         q, dq, u_r, vel_q = params.q, params.dq, params.u_r, params.vel_q

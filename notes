@@ -71,18 +71,29 @@ MAIN
     Need to investigate more. See stochastic gradient descend vs batch gradient descent
     > Batch_size = 25, epochs = 200, patience = 20 seems to work.
 
-13) Add cross-validation
+13) Add cross-validation : ROC-AUC score, 5 fold CV
 
 MAIN
 14) Trained using 100 curves, deploy on unknown field - ideally it should follow curve. But because of large variety,
     Robot is collecting data + trained model. Online training to improve model. Feedback control.
     Maybe combine with another model/ reinforcement learning.
     Maybe use only field value and not gradient. Average. Get error between real value and desired value.
+    Moving mean/variance to scale.
+    SGD to train
+    Transfer learning - only some layers trainable.
+    Hedge Regressor and weigh multiple models.
+    Tune learning rate in real time.
 
 15) Number of hidden layers = Nh = Ns / (alpha * (Ni + No)); alpha = 2-10, Ni, No = Number of input/output neurons, Ns = Number of samples.
 
 16) Dropout for generalization
 
 17) Debug and fix Elipse.
+    > Done, moved away from sqrt.
 
-18) Refactor motionControl code, maybe similar to hessianEstimation?
+18) Refactor motionControl code, maybe similar to hessianEstimation? Use sklearn pipeline
+
+19) Try to train curve features only on data once we reach curve. ie. Filter out data while we are still away from the curve.
+
+20) How to train scaler: Can't use scaler directly in test because we dont know the whole dataset during stepping.
+    - Running mean and running variance
