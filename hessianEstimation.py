@@ -1,4 +1,4 @@
-import params as params
+import params
 from formationCenter import formationCenter
 from formationControl import formationControl
 import numpy as np
@@ -53,6 +53,9 @@ class Hessian:
             print(model.summary())
 
         hessian = function.hessian_f(r_c[0], r_c[1])
+        z_c = function.f(r_c[0], r_c[1])
+        y_2 = dz_c / norm(dz_c)
+        x_2 = p.rotateRight @ y_2
 
         for i in range(10000):
             # Decoupled: Ideal test.
@@ -68,12 +71,8 @@ class Hessian:
 
             z_r = np.array([function.f(*pt) for pt in r])
             # hessian = [[0, 0], [0, 0]]
-            r_c, x_2, y_2, tmp = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, i,
-                                                 p.rotateRight, p.rotateLeft,
-                                                 function.mu_f, function.z_desired,
-                                                 p.K4, p.dt)
-            r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q, p.a, p.b,
-                                                    p.dt, p.K2, p.K3, p.phi_inv)
+            r_c, x_2, y_2 = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, function.mu_f, function.z_desired)
+            r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q)
             state = np.concatenate([r_c, [z_c], dz_c, *r, z_r, *hessian])
             if collect:
                 trainData = trainData.append(pd.Series(state, ignore_index=True))

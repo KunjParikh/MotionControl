@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import LSTM
+from numpy.linalg import norm
 
 # Comment this to use GPU. But looks like for me CPU (~10s) is faster than GPU (~80s).
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -73,7 +74,6 @@ if True or __name__ == "__main__":
 
     for function in testFunctions:
         r_c, r_c_old, r, = params.r_c, params.r_c, params.r
-        x_2, y_2 = 0, 0  # Ignored in formationCenter for i == 0
         q, dq, u_r, vel_q = params.q, params.dq, params.u_r, params.vel_q
 
         # Kalman Filter initialization
@@ -83,6 +83,9 @@ if True or __name__ == "__main__":
         dz_c = function.dz_f(r_c[0], r_c[1])
         hessian = function.hessian_f(r_c[0], r_c[1])
         z_r = np.array([function.f(*pt) for pt in r])
+
+        y_2 = dz_c / norm(dz_c)
+        x_2 = params.rotateRight @ y_2
 
         r_c_plot = [r_c]
         r_plot = [r]
@@ -186,13 +189,9 @@ if True or __name__ == "__main__":
             # dz_c = dz_f(r_c[0], r_c[1])
             # print(dz_c)
             r_c_old = r_c
-            r_c, x_2, y_2, hessian = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, i,
-                                                     params.rotateRight, params.rotateLeft,
-                                                     function.mu_f, function.z_desired,
-                                                     params.K4, params.dt)
+            r_c, x_2, y_2 = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, function.mu_f, function.z_desired)
 
-            r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q, params.a, params.b,
-                                                    params.dt, params.K2, params.K3, params.phi_inv)
+            r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q)
 
             hessian_state = np.concatenate([r_c, [z_c], dz_c, *r, z_r, *hessian])
             hessian_state = scaler_hessian.transform(hessian_state.reshape(1, -1))

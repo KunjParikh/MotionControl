@@ -7,16 +7,18 @@ import params
 import utils as utils
 pltVar = utils.PlotVariable("testVar")
 
-def formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, i, rotateRight, rotateLeft, mu_f, z_desired, K4, dt):
+def formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, mu_f, z_desired):
     # hessian = np.array([[2, 0],[2, 0]]) * np.random.rand(1)
     # z_c, dz_c, p = kalmanFilter(z_c, dz_c, r, z_r, r_c, r_c_old, p, hessian, numSensors)
 
+    p = params.Params()
+    rotateLeft = p.rotateLeft
+    rotateRight = p.rotateRight
+    K4 = p.K4
+    dt = p.dt
+
     y_1 = dz_c / norm(dz_c)
     x_1 = rotateRight @ y_1
-
-    if i == 0:
-        x_2 = x_1
-        y_2 = y_1
 
     theta = atan2(x_2[1], x_2[0]) - atan2(x_1[1], x_1[0])
     kappa_1 = (x_1.T @ hessian @ x_1) / norm(dz_c)
@@ -33,24 +35,26 @@ def formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, i, rotateRight, rotateLef
     y_2 = rotateLeft @ x_2
     pltVar.push(u_c)
     r_c = r_c + dt * x_2
-    return r_c, x_2, y_2, hessian
+    return r_c, x_2, y_2
 
 
 if __name__ == "__main__":
-    params = params.Params()
-    for function in params.test_functions:
-        r_c, r_c_old, x_2, y_2 = params.r_c, params.r_c, 0, 0
+    p = params.Params()
+    testFunctions = p.functions
+    for function in testFunctions:
+        r_c, r_c_old = p.r_c, p.r_c
         r_c_plot = [r_c]
+
+        dz_c = function.dz_f(r_c[0], r_c[1])
+        y_2 = dz_c / norm(dz_c)
+        x_2 = p.rotateRight @ y_2
         for i in range(10000):
             # Decoupled: Ideal test.
             z_c = function.f(r_c[0], r_c[1])
             dz_c = function.dz_f(r_c[0], r_c[1])
             hessian = function.hessian_f(r_c[0], r_c[1])
             # hessian = [[0, 0], [0, 0]]
-            r_c, x_2, y_2, tmp = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, i,
-                                                 params.rotateRight, params.rotateLeft,
-                                                 function.mu_f, function.z_desired,
-                                                 params.K4, params.dt)
+            r_c, x_2, y_2 = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, function.mu_f, function.z_desired)
             r_c_plot.append(r_c)
 
         x = np.linspace(-10, 10, 200)

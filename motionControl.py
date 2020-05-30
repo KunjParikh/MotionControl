@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pickle
 from pandas import Series
+from numpy.linalg import norm
 
 # !ls '/content/drive/My Drive/SJSU/Final Project/model_state.h5'
 
@@ -20,7 +21,6 @@ if True or __name__ == "__main__":
     for function in allFunctions:
         print("Collecting data for {}".format(function.name))
         r_c, r_c_old, r, = params.r_c, params.r_c, params.r
-        x_2, y_2 = 0, 0  # Ignored in formationCenter for i == 0
         q, dq, u_r, vel_q = params.q, params.dq, params.u_r, params.vel_q
         # Kalman Filter initialization
         numSensors = params.numSensors
@@ -38,6 +38,8 @@ if True or __name__ == "__main__":
         keys = list(range(18))
         df_state = pd.DataFrame()
         df_error = pd.DataFrame()
+        y_2 = dz_c / norm(dz_c)
+        x_2 = params.rotateRight @ y_2
 
         for i in range(10000):
             z_r = np.array([function.f(*pt) for pt in r])
@@ -95,13 +97,10 @@ if True or __name__ == "__main__":
             # dz_c = dz_f(r_c[0], r_c[1])
             # print(dz_c)
             r_c_old = r_c
-            r_c, x_2, y_2, _ = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, i,
-                                               params.rotateRight, params.rotateLeft,
-                                               function.mu_f, function.z_desired,
-                                               params.K4, params.dt)
+            r_c, x_2, y_2 = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2,
+                                               function.mu_f, function.z_desired)
 
-            r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q, params.a, params.b,
-                                                    params.dt, params.K2, params.K3, params.phi_inv)
+            r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q)
             r_c_plot.append(r_c)
             if i % 150 == 0:
                 r_plot.append(r)

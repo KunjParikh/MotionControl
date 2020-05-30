@@ -1,6 +1,11 @@
 import numpy as np
+import params as params
 
-def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian, numSensors):
+def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian):
+
+    px = params.Params()
+    numSensors = px.numSensors
+
     s = np.array([z_c, *dz])  # 3x1
     m = 0.001 * np.identity(3)  # 3x1
     R = 0.001 * np.identity(numSensors)  # 4x4
@@ -12,7 +17,7 @@ def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian, numSensors):
         0,
         *(hessian @ (r_c - r_c_old))  # 2x2 . 2x1 = 2x1
     ])  # 3x1
-    hc = np.array([hessian[0, 0], hessian[1, 0], hessian[0, 1], hessian[1, 1]])  # 4x1
+    hc = np.array([hessian[0][0], hessian[1][0], hessian[0][1], hessian[1][1]])  # 4x1
     c = np.hstack((np.ones((numSensors, 1)), r - r_c))  # 4x3
     d = 0.5 * np.vstack([np.kron(pt - r_c, pt - r_c) for pt in r])  # 4x4
 

@@ -1,8 +1,17 @@
-import params
+import params as params
 import numpy as np
 from math import sqrt
 
-def formationControl(r_c, r, q, dq, u_r, vel_q, a, b, dt, K2, K3, phi_inv):
+def formationControl(r_c, r, q, dq, u_r, vel_q):
+    
+    p = params.Params()
+    a = p.a
+    b = p.b
+    dt = p.dt
+    K2 = p.K2
+    K3 = p.K3
+    phi_inv = p.phi_inv
+
     e_1 = r[1] - r[0]
     e_1 = e_1 / np.linalg.norm(e_1)
     e_2 = r[2] - r[3]
@@ -28,11 +37,9 @@ def formationControl(r_c, r, q, dq, u_r, vel_q, a, b, dt, K2, K3, phi_inv):
 #
 
 if __name__ == "__main__":
-    params = params.Params()
-    r_c, r, q, dq, u_r, vel_q = params.r_c, params.r, params.q, \
-                                params.dq, params.u_r, params.vel_q
+    p = params.Params()
+    r_c, r, q, dq, u_r, vel_q = p.r_c, p.r, p.q, p.dq, p.u_r, p.vel_q
 
     for i in range(1000):
         print(r)
-        r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q, params.a, params.b,
-                            params.dt, params.K2, params.K3, params.phi_inv)
+        r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q)
