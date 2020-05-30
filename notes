@@ -2,6 +2,7 @@ MAIN
 1) Hessian Estimation
     - Limited sensors, noisy.
     - First pass implemented. Improve results pending.
+    - Measure performance standalone from rest of the app.
 
 2) MakeFile for sbatch
 3) reset states before each new LSTM training
@@ -82,7 +83,8 @@ MAIN
     SGD to train
     Transfer learning - only some layers trainable.
     Hedge Regressor and weigh multiple models.
-    Tune learning rate in real time.
+    Tune learning rate in real time. Resource allocating network.
+    Creme APIs if we move to simpler models for online learning
 
 15) Number of hidden layers = Nh = Ns / (alpha * (Ni + No)); alpha = 2-10, Ni, No = Number of input/output neurons, Ns = Number of samples.
 
@@ -92,8 +94,14 @@ MAIN
     > Done, moved away from sqrt.
 
 18) Refactor motionControl code, maybe similar to hessianEstimation? Use sklearn pipeline
+    > Use all features for Kalman Filter LSTM, not just previous state and error. (eg measurements)
 
 19) Try to train curve features only on data once we reach curve. ie. Filter out data while we are still away from the curve.
 
 20) How to train scaler: Can't use scaler directly in test because we dont know the whole dataset during stepping.
     - Running mean and running variance
+
+21) Try out simpler models for time-series analysis. eg. ARIMA, VAR, Baysean linear regression, Kernel Trick for non-linear.
+    https://otexts.com/fpp2/nnetar.html
+
+22) Maybe we need less number of robots as we are training using past. 
