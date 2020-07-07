@@ -1,5 +1,6 @@
 import numpy as np
 from math import cos, sin, pi
+import random
 
 
 class Function:
@@ -11,76 +12,113 @@ class Function:
         self.z_desired = z_desired  # 16
         self.mu_f = mu_f  # 10
 
+class FunctionGenerator:
+    def generate(self, num):
+        flist = [*2*['circle'], 'circle_4', 'circle_6', *3*['elipse'], *2*['irregular1'], 'irregular2', 'rhombus']
+        randlist = [p for p in range(2, 11)]
+        # rand = random.random() * 10
+
+        functions = []
+        functionsUsed = []
+
+        while len(functions) < num:
+            type = random.choice(flist)
+            rand = random.choice(randlist)
+            method = getattr(self, type)
+            if "{}_{}".format(type, rand) not in functionsUsed:
+                functions.append(method(rand))
+                functionsUsed.append("{}_{}".format(type, rand))
+
+        return functions
+
+    def getFunction(self, name):
+        nameParts = name.split("_")
+        type = '_'.join(nameParts[:-1])
+        rand = float(nameParts[-1])
+        method = getattr(self, type)
+        return method(rand)
+
+    def circle(self, rand):
+        return Function("circle_{}".format(rand),
+                     np.vectorize(lambda x, y: rand * (x ** 2) + (y ** 2)),
+                     lambda x, y: [2 * rand * (x ** 1), 2 * (y ** 1)],
+                     lambda x, y: [[2 * rand, 0], [0, 2]],
+                     16,
+                     10
+                     )
+
+    def circle_4(self, rand):
+        return Function("circle_4_{}".format(rand),
+                     np.vectorize(lambda x, y: (x ** 4) + rand * (y ** 4)),
+                     lambda x, y: [4 * (x ** 3), 4 * rand * (y ** 3)],
+                     lambda x, y: [[12 * (x ** 2), 0], [0, 12 * rand * (y ** 2)]],
+                     32,
+                     0.1
+                     )
+
+    def circle_6(self, rand):
+        return Function("circle_6_{}".format(rand),
+                     np.vectorize(lambda x, y: rand * (x ** 6) + (y ** 6)),
+                     lambda x, y: [6 * rand * (x ** 5), 6 * (y ** 5)],
+                     lambda x, y: [[30 * rand * (x ** 4), 0], [0, 30 * (y ** 4)]],
+                     64,
+                     0.01
+                     )
+
+    def elipse(self, rand):
+        return Function("elipse_{}".format(rand),
+                     np.vectorize(lambda x, y: rand * (x ** 2) + (3 * (y ** 2)) + (4 * y) - x - (2 * x * y)),
+                     lambda x, y: [(2 * rand * x) - 1 - (2 * y), (6 * y) + 4 - (2 * x)],
+                     lambda x, y: np.array([[2 * rand, -2], [-2, 6]]),
+                     16,
+                     10)
+
+    def irregular1(self, rand):
+        return Function("irregular1_{}".format(rand),
+                        np.vectorize(lambda x, y: (x ** 2 + rand * y - 11) ** 2 + (x + y ** 2 - 7) ** 2),
+                        lambda x, y: [2 * (x ** 2 + rand * y - 11) * 2 * x + 2 * (x + y ** 2 - 7),
+                                      2 * rand * (x ** 2 + rand * y - 11) + 2 * (x + y ** 2 - 7) * 2 * y],
+                        lambda x, y: np.array([[12 * (x ** 2) + 4 * rand * y - 42, 4 * rand * x + 4 * y],
+                                               [4 * rand * x + 4 * y, 4 * x + (2 * rand**2 - 28) + 12 * (y ** 2)]]),
+                        144,
+                        0.1
+                     )
+
+    def irregular2(self, rand):
+        return Function("irregular2_{}".format(rand),
+                        np.vectorize(lambda x, y: (x ** 2 + 2 * y - 12) ** 2 + (rand * x + y ** 2 - 17) ** 2),
+                        lambda x, y: [(4 * x ** 3 + (2 * rand ** 2 - 48 ) * x + 8 * x * y + 2 * rand * y ** 2 - 34 * rand),
+                                      (4 * x ** 2 + 4 * rand * x * y - 60 * y + 4 * y ** 3 - 48)],
+                        lambda x, y: np.array([[12 * (x ** 2) + 8 * y + (2 * rand ** 2 - 48), 8 * x + 4 * rand * y],
+                                               [8 * x + 4 * rand * y, 4 * rand * x + 12 * (y ** 2) - 60]]),
+                        400,
+                        0.1
+                     )
+
+    def rhombus(self, rand):
+        return Function("rhombus_{}".format(rand),
+                        np.vectorize(lambda x, y: abs(x) + rand * abs(y)),
+                        lambda x, y: [np.sign(x), rand * np.sign(y)],  # Square cone
+                        lambda x, y: [[1, 0], [0, rand]],
+                        6,
+                        100
+                        )
 
 class Params:
     def __init__(self):
         # Globals - Function definition
 
+        fg = FunctionGenerator()
         self.functions = [
-            Function("circle",
-                     np.vectorize(lambda x, y: (x ** 2) + (y ** 2)),
-                     lambda x, y: [2 * (x ** 1), 2 * (y ** 1)],
-                     lambda x, y: [[2, 0], [0, 2]],
-                     16,
-                     10
-                     ),
-
-            Function("circle_4",
-                     np.vectorize(lambda x, y: (x ** 4) + (y ** 4)),
-                     lambda x, y: [4 * (x ** 3), 4 * (y ** 3)],
-                     lambda x, y: [[12 * (x ** 2), 0], [0, 12 * (y ** 2)]],
-                     32,
-                     0.1
-                     ),
-
-            Function("circle_6",
-                     np.vectorize(lambda x, y: (x ** 6) + (y ** 6)),
-                     lambda x, y: [6 * (x ** 5), 6 * (y ** 5)],
-                     lambda x, y: [[30 * (x ** 4), 0], [0, 30 * (y ** 4)]],
-                     64,
-                     0.01
-                     ),
-
-            # np.sqrt can handle array, math.sqrt only works with scalar. > Causes problem with meshgrid and contour
-            # plot later.
-            Function("elipse",
-                     np.vectorize(lambda x, y: (x ** 2) + (3 * (y ** 2)) + (4 * y) - x - (2 * x * y)),
-                     lambda x, y: [(2 * x) - 1 - (2 * y), (6 * y) + 4 - (2 * x)],
-                     lambda x, y: np.array([[2, -2], [-2, 6]]),
-                     16,
-                     10),
-
-            Function(
-                "irregular1",
-                np.vectorize(lambda x, y: (x ** 2 + y - 11) ** 2 + (x + y ** 2 - 7) ** 2),
-                lambda x, y: [2 * (x ** 2 + y - 11) * 2 * x + 2 * (x + y ** 2 - 7),
-                              2 * (x ** 2 + y - 11) + 2 * (x + y ** 2 - 7) * 2 * y],
-                lambda x, y: np.array([[12 * (x ** 2) + 4 * y - 42, 4 * x + 4 * y],
-                                       [4 * x + 4 * y, 4 * x - 26 + 12 * (y ** 2)]]),
-                144,
-                0.1
-            ),
-
-            Function(
-                "irregular2",
-                np.vectorize(lambda x, y: (x ** 2 + 2 * y - 12) ** 2 + (x + y ** 2 - 17) ** 2),
-                lambda x, y: [(4 * x ** 3 - 46 * x + 8 * x * y + 2 * y ** 2 - 34),
-                              (4 * x ** 2 + 4 * x * y - 60 * y + 4 * y ** 3 - 48)],
-                lambda x, y: np.array([[12 * (x ** 2) + 8 * y - 46, 8 * x + 4 * y],
-                                      [8 * x + 4 * y, 4 * x + 12 * (y ** 2) - 60]]),
-                400,
-                0.1
-            ),
-
-            Function("rhombus",
-                     np.vectorize(lambda x, y: abs(x) + abs(y)),
-                     lambda x, y: [np.sign(x), np.sign(y)], #Square cone
-                     lambda x, y: [[1, 0], [0, 1]],
-                     6,
-                     100
-                     )
-
+            fg.circle(1),
+            fg.circle_4(1),
+            fg.circle_6(1),
+            fg.elipse(1),
+            fg.irregular1(1),
+            fg.irregular2(1),
+            fg.rhombus(1)
         ]
+        self.functions.extend(fg.generate(20))
 
         # Parameters - Formation Control
         self.numSensors = 4

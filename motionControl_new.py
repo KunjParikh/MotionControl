@@ -20,12 +20,11 @@ import math
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import MinMaxScaler
 from keras.models import load_model
-from utils import PlotVariable
+from utils import PlotVariables
+from keras.utils.vis_utils import plot_model
+from statistics import mean
 
-var1 = PlotVariable("z_c")
-var2 = PlotVariable("dz_c_x")
-var3 = PlotVariable("dz_c_y")
-var4 = PlotVariable("var4")
+pltVar = PlotVariables('shape', ["z", "dz_x", "dz_y"])
 
 def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian, model = False):
 
@@ -50,6 +49,8 @@ def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian, model = False):
 
     if model:
         s_e, p_e = model.predict([s,p])
+        if (p_e == np.zeros((3,3))).flatten().all():
+            p_e = m
 
     else:
         s_e = a @ s + h  # 3x1
@@ -74,7 +75,7 @@ def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian, model = False):
 
     z_c = s[0]
     dz = s[1:]
-    return z_c, dz, p, [s_old, p_old, s_e, p_e]
+    return z_c, dz, p, [s_old, p_old, s, p] # Use actual s and p value - not the one predicted by eq1 and eq2
 
 # !ls '/content/drive/My Drive/SJSU/Final Project/model_state.h5'
 class Shape:
@@ -120,12 +121,13 @@ class Shape:
                                            self.function.mu_f, self.function.z_desired)
         r_c_p, x_2_p, y_2_p = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2,
                                            self.function.mu_f, self.function.z_desired)
-        var1.push(r_c[0], r_c_p[0])
-        var2.push(r_c[1], r_c_p[1])
-        var3.push(x_2[0], x_2_p[0])
-        var4.push(x_2[1], x_2_p[1])
+        pltVar.push('z', z_c_k, z_c_p)
+        pltVar.push('dz_x', dz_c_k[0], dz_c_p[0])
+        pltVar.push('dz_y', dz_c_k[1], dz_c_p[1])
+
 
         r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q)
+        # pltVar.push('z_c', mean(np.array([self.function.f(*pt) for pt in r])), z_c)
 
         state = [r_c, z_c, dz_c, r_c_old, p, r, q, dq, u_r, vel_q, x_2, y_2]
         # data = [r_c, z_c, dz_c, hessian, r, z_r, p]
@@ -152,6 +154,7 @@ class Shape:
                 r_plot.append(state[5])
 
         dataframe = pd.concat([pd.DataFrame([i], columns=['s', 'p', 's_e', 'p_e']) for i in data], ignore_index=True)
+
         self.plot(r_c_plot, r_plot)
         return dataframe
 
@@ -174,34 +177,6 @@ class Shape:
         plt.savefig("{}.pdf".format(self.name), bbox_inches='tight')
         plt.close()
 
-class Experiment:
-    def __init__(self):
-        pass
-        # self.allShapes = [Shape(x) for x in self.params.functions if x.name in ['elipse']]
-
-    def collect(self):
-        params = params.Params()
-        allShapes = [Shape(x) for x in params.functions]
-        shapesData = pd.Series(dtype='object')
-        for shape in allShapes:
-            data = shape.trace()
-            shapesData = shapesData.append(pd.Series({shape.name: data}))
-        pkl.dump(shapesData, open("shapesData.p", "wb"))
-
-    def train(self):
-        shapesData = pkl.load(open("shapesData.p", "rb"))
-        trainShapes = [x for x in shapesData.keys() if x not in ['elipse_1']]
-        model = Model()
-        model.train(trainShapes)
-
-    def test(self):
-        shapesData = pkl.load(open("shapesData.p", "rb"))
-        # testNames = [x for x in shapesData.keys() if x in ['elipse_1']]
-        testNames = [x for x in shapesData.keys()]
-        fg = params.FunctionGenerator()
-        testShapes = [Shape(fg.getFunction(name)) for name in testNames]
-        for shape in testShapes:
-            shape.simulate()
 
 class Model:
     def __init__(self, loadModel=False):
@@ -271,6 +246,8 @@ class Model:
             model_state.add(LSTM(numNeurons, batch_input_shape=(batch_size, 1, numFeaturesX), stateful=True))
             model_state.add(Dense(numFeaturesY))
             model_state.compile(loss='mean_squared_error', optimizer='adam')
+            plot_model(model, show_shapes=True, to_file='model_state.png')
+
 
         es = EarlyStopping(monitor='loss', mode='min', verbose=1, patience=20)
         mc = ModelCheckpoint(os.path.join(self.rootpath, "model_state.h5"),
@@ -297,6 +274,7 @@ class Model:
             model_error.add(LSTM(numNeurons, batch_input_shape=(batch_size, 1, numFeaturesX), stateful=True))
             model_error.add(Dense(numFeaturesY))
             model_error.compile(loss='mean_squared_error', optimizer='adam')
+            plot_model(model, show_shapes=True, to_file='model_error.png')
 
         es = EarlyStopping(monitor='loss', mode='min', verbose=1, patience=20)
         mc = ModelCheckpoint(os.path.join(self.rootpath, "model_error.h5"),
@@ -349,6 +327,7 @@ class Model:
 
     def predict(self, data):
         s, p = data
+        # return s, p
         data = np.array([[*s, *np.reshape(p, (9))]])
         data = self.scalerX.transform(data)
 
@@ -392,16 +371,41 @@ class Model:
             trainScore = math.sqrt(mean_squared_error(trainY, trainPredict_invScaled))
             print("Evaluate Score for shape {}: {} RMSE".format(name, trainScore))
 
+class Experiment:
+    def __init__(self):
+        pass
+        # self.allShapes = [Shape(x) for x in self.params.functions if x.name in ['elipse']]
+
+    def collect(self):
+        params = params.Params()
+        allShapes = [Shape(x) for x in params.functions]
+        shapesData = pd.Series(dtype='object')
+        for shape in allShapes:
+            data = shape.trace()
+            shapesData = shapesData.append(pd.Series({shape.name: data}))
+        pkl.dump(shapesData, open("shapesData.p", "wb"))
+
+    def train(self):
+        shapesData = pkl.load(open("shapesData.p", "rb"))
+        trainShapes = [x for x in shapesData.keys() if x not in ['elipse_1']]
+        model = Model()
+        model.train(trainShapes)
+
+    def test(self):
+        shapesData = pkl.load(open("shapesData.p", "rb"))
+        testNames = [x for x in shapesData.keys() if x in ['irregular1_8']]
+        # testNames = [x for x in shapesData.keys()]
+        fg = params.FunctionGenerator()
+        testShapes = [Shape(fg.getFunction(name)) for name in testNames]
+        for shape in testShapes:
+            shape.simulate()
 
 if True or __name__ == "__main__":
     experiment = Experiment()
     # experiment.collect()
     # experiment.train()
     experiment.test()
-    # var1.plot()
-    # var2.plot()
-    # var3.plot()
-    # var4.plot()
+    pltVar.plot()
     # model = Model(loadModel=True)
     # model.evaluate(["elipse"])
 

@@ -1,6 +1,26 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+class PlotVariables:
+    def __init__(self, id, names):
+        self.vars = {name:PlotVariable(name) for name in names}
+        self.id = id
+
+    def push(self, name, value, value2=False, value3=False, value4=False):
+        self.vars[name].push(value, value2, value3, value4)
+
+    def plot(self):
+        plt.figure()
+        numVars = len(self.vars)
+        i = 1
+        for k in self.vars:
+            plt.subplot(numVars, 1, i)
+            self.vars[k].plot()
+            i = i + 1
+
+        plt.savefig("utils_plot_{}.pdf".format(self.id), bbox_inches='tight')
+        plt.close()
+
 class PlotVariable:
     def __init__(self, name):
         self.name = name
@@ -30,16 +50,15 @@ class PlotVariable:
         if self.value4.shape[0] > 0:
             plt.plot(self.value4, 'y')
         plt.title(self.name)
-        plt.show()
+        # plt.show()
 
 
 if __name__ == "__main__":
-    var = PlotVariable("testVar")
-    var.push(1, 3)
-    var.push(2, 4)
-    var.plot()
 
-    var = PlotVariable("testVar1")
-    var.push(2)
-    var.push(2)
+    var = PlotVariables('elipse', ["testVar", "testVar1"])
+    var.push('testVar', 1, 3)
+    var.push('testVar', 2, 4)
+
+    var.push('testVar1', 2)
+    var.push('testVar1', 2)
     var.plot()
