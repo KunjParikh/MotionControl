@@ -10,13 +10,21 @@ import pandas as pd
 import pickle as pkl
 from numpy.linalg import norm
 from keras.models import Sequential
+
+from keras.models import Model
+from keras.layers import Input
+from keras.layers import Flatten
+from keras.layers import Dropout
 from keras.layers import Dense
 from keras.layers import LSTM
+from keras.layers.convolutional import Conv1D
+from keras.layers.convolutional import MaxPooling1D
+from keras.layers.merge import concatenate
 from keras.callbacks import EarlyStopping
 from keras.callbacks import ModelCheckpoint
 from keras.callbacks import LambdaCallback
 import os
-import math
+from math import sqrt
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import MinMaxScaler
 from keras.models import load_model
@@ -75,7 +83,9 @@ def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian, model = False):
 
     z_c = s[0]
     dz = s[1:]
-    return z_c, dz, p, [s_old, p_old, s, p] # Use actual s and p value - not the one predicted by eq1 and eq2
+    # Use actual s and p value - not the one predicted by eq1 and eq2
+    # return only s and p values for data here, lag values etc are done in training code.
+    return z_c, dz, p, [s, p]
 
 # !ls '/content/drive/My Drive/SJSU/Final Project/model_state.h5'
 class Shape:
@@ -111,6 +121,9 @@ class Shape:
             z_c = z_c_p
             dz_c = dz_c_p
             p = p_p
+            pltVar.push('z', z_c_k, z_c_p)
+            pltVar.push('dz_x', dz_c_k[0], dz_c_p[0])
+            pltVar.push('dz_y', dz_c_k[1], dz_c_p[1])
         else:
             z_c, dz_c, p, data = kalmanFilter(z_c, dz_c, r, z_r, r_c, r_c_old, p, hessian)
         # z_c = f(r_c[0], r_c[1])
@@ -121,9 +134,7 @@ class Shape:
                                            self.function.mu_f, self.function.z_desired)
         r_c_p, x_2_p, y_2_p = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2,
                                            self.function.mu_f, self.function.z_desired)
-        pltVar.push('z', z_c_k, z_c_p)
-        pltVar.push('dz_x', dz_c_k[0], dz_c_p[0])
-        pltVar.push('dz_y', dz_c_k[1], dz_c_p[1])
+
 
 
         r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q)
@@ -153,13 +164,14 @@ class Shape:
             if i % 150 == 0:
                 r_plot.append(state[5])
 
-        dataframe = pd.concat([pd.DataFrame([i], columns=['s', 'p', 's_e', 'p_e']) for i in data], ignore_index=True)
+        dataframe = pd.DataFrame(data, columns = ['s', 'p'])
+        # dataframe = pd.concat([pd.DataFrame([i], columns=['s', 'p']) for i in data], ignore_index=True)
 
         self.plot(r_c_plot, r_plot)
         return dataframe
 
     def simulate(self):
-        model = Model(loadModel=True)
+        model = MotionControlModel(loadModel=True)
         self.trace(model)
 
     def plot(self, r_c_plot, r_plot):
@@ -178,116 +190,90 @@ class Shape:
         plt.close()
 
 
-class Model:
+class MotionControlModel:
     def __init__(self, loadModel=False):
 
-        self.rootpath = ""
+        self.rootpath = "/tmp"
         self.model = False
         self.scalerX = False
         self.scalerY = False
+
+        self.numFeaturesState = 3
+        self.numFeaturesError = 9
+        self.lagWindowSize = 10
+        self.history = np.zeros((10, 3+9)).tolist()
+
         if loadModel:
             self.load()
 
-    def processData(self, df, scaleY=True):
-        features = df.to_numpy()
-        # s - 3x1
-        # p - 3x3
-        # s_e - 3x1
-        # p_e - 3x3
-        trainX = np.array([[x[0][0], x[0][1], x[0][2],
-                              x[1][0][0], x[1][0][1], x[1][0][2], x[1][1][0], x[1][1][1], x[1][1][2], x[1][2][0], x[1][2][1], x[1][2][2]
-                              ] for x in features])
-
-        trainY = np.array([[x[2][0], x[2][1], x[2][2],
-                              x[3][0][0], x[3][0][1], x[3][0][2], x[3][1][0], x[3][1][1], x[3][1][2], x[3][2][0], x[3][2][1], x[3][2][2]
-                              ] for x in features])
-
-        # pw = 1 # predict 1 step ahead: predictWindow
-        # trainX[pw:][:] = trainX[:-pw][:]
-        # trainX[0:pw][:] = trainX[pw][:]
-        # trainY[0:pw][:] = trainY[pw][:]
-
-        scaler = MinMaxScaler(feature_range=(-1, 1))
-        trainX = scaler.fit_transform(trainX)
-        pkl.dump(scaler, open("scalerX.p", "wb"))
-        scaler = MinMaxScaler(feature_range=(-1, 1))
-        trainY_scaled = scaler.fit_transform(trainY)
-        pkl.dump(scaler, open("scalerY.p", "wb"))
-
-        trainY_return = False
-        if scaleY:
-            trainY_return = trainY_scaled
+    def processData(self, df, learn=True):
+        if isinstance(df, pd.DataFrame):
+            raw_data = df.to_numpy()
         else:
-            trainY_return = trainY
+            raw_data = df
+        unscaled_data = np.array([[x[0][0], x[0][1], x[0][2],
+                            x[1][0][0], x[1][0][1], x[1][0][2], x[1][1][0], x[1][1][1], x[1][1][2], x[1][2][0],
+                            x[1][2][1], x[1][2][2]
+                            ] for x in raw_data])
+        datalength = unscaled_data.shape[0]
 
-        return trainX, trainY_return
+        if learn == False:
+            self.history.append(unscaled_data[0])
+            self.history = self.history[1:]
+
+        if learn:
+            scaler = MinMaxScaler(feature_range=(-1, 1))
+            scaled_data = scaler.fit_transform(unscaled_data)
+            pkl.dump(scaler, open("scaler.p", "wb"))
+        else:
+            scaled_data = self.scaler.transform(self.history)
+
+        lagWindowSize = self.lagWindowSize
+        numFeaturesState = self.numFeaturesState
+
+        # LSTM needs input in [samples, timestep, features] format.
+        if learn:
+            X = np.array([scaled_data[i-lagWindowSize:i,:] for i in range(lagWindowSize, datalength)])
+            Y = scaled_data[lagWindowSize:,:]
+            X = [X[:, :, 0:numFeaturesState], X[:, :, numFeaturesState:]]
+            Y = [Y[:, 0:numFeaturesState], Y[:, numFeaturesState:]]
+        else:
+            X = np.array([scaled_data])
+            X = [X[:, :, 0:numFeaturesState], X[:, :, numFeaturesState:]]
+            Y = False
+
+        return X, Y
 
     def trainShape(self, dataset, model=False):
-        trainX_c, trainY_c = self.processData(dataset)
+        X, Y = self.processData(dataset)
 
+        numFeaturesState = self.numFeaturesState
+        numFeaturesError = self.numFeaturesError
+
+        batch_size = 10
+        lagWindowSize = 10
         if model == False:
-            model_state = False
-            model_error = False
-        else:
-            model_state, model_error = model
+            input1 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesState))
+            lstm1 = LSTM(10, stateful=True)(input1)
+            output1 = Dense(numFeaturesState)(lstm1)
 
-        #model_state
-        trainX = trainX_c[:,0:3]
-        trainY = trainY_c[:,0:3]
-        numFeaturesX = trainX.shape[1]
-        numFeaturesY = trainY.shape[1]
-        np.random.seed(7)
-        trainX = np.reshape(trainX, (trainX.shape[0], 1, trainX.shape[1]))
+            input2 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesError))
+            lstm2 = LSTM(20, stateful=True)(input2)
+            output2 = Dense(numFeaturesError)(lstm2)
 
-        batch_size = 25
-        if model_state == False:
-            model_state = Sequential()
-            numNeurons = numFeaturesX + 1
-            model_state.add(LSTM(numNeurons, batch_input_shape=(batch_size, 1, numFeaturesX), stateful=True))
-            model_state.add(Dense(numFeaturesY))
-            model_state.compile(loss='mean_squared_error', optimizer='adam')
-            plot_model(model, show_shapes=True, to_file='model_state.png')
-
+            model = Model(inputs=[input1, input2], outputs=[output1, output2])
+            model.compile(loss='mse', optimizer='adam')
+            plot_model(model, show_shapes=True, to_file='model.png')
 
         es = EarlyStopping(monitor='loss', mode='min', verbose=1, patience=20)
-        mc = ModelCheckpoint(os.path.join(self.rootpath, "model_state.h5"),
+        mc = ModelCheckpoint(os.path.join(self.rootpath, "model.h5"),
             monitor='loss', mode='min', verbose=1, save_best_only=True)
-        rs = LambdaCallback(on_epoch_end=lambda epoch, logs: model_state.reset_states())
-        history = model_state.fit(trainX, trainY, epochs=200, batch_size=batch_size, verbose=2, callbacks=[es, mc, rs], shuffle=False)
+        rs = LambdaCallback(on_epoch_end=lambda epoch, logs: model.reset_states())
+        history = model.fit(X, Y, epochs=200, batch_size=batch_size, verbose=2, callbacks=[es, mc, rs], shuffle=False)
 
-        trainPredict = model_state.predict(trainX, batch_size = batch_size)
-        trainScore = math.sqrt(mean_squared_error(trainY, trainPredict))
+        trainPredict = model.predict(X, batch_size = batch_size)
+        trainScore = [sqrt(x) for x in  mean_squared_error(np.hstack(Y), np.hstack(trainPredict), multioutput='raw_values')]
         print("Train Score: {} RMSE".format(trainScore))
-
-        # model_error
-        trainX = trainX_c[:,3:]
-        trainY = trainY_c[:,3:]
-        numFeaturesX = trainX.shape[1]
-        numFeaturesY = trainY.shape[1]
-        np.random.seed(7)
-        trainX = np.reshape(trainX, (trainX.shape[0], 1, trainX.shape[1]))
-
-        batch_size = 25
-        if model_error == False:
-            model_error = Sequential()
-            numNeurons = numFeaturesX + 1
-            model_error.add(LSTM(numNeurons, batch_input_shape=(batch_size, 1, numFeaturesX), stateful=True))
-            model_error.add(Dense(numFeaturesY))
-            model_error.compile(loss='mean_squared_error', optimizer='adam')
-            plot_model(model, show_shapes=True, to_file='model_error.png')
-
-        es = EarlyStopping(monitor='loss', mode='min', verbose=1, patience=20)
-        mc = ModelCheckpoint(os.path.join(self.rootpath, "model_error.h5"),
-            monitor='loss', mode='min', verbose=1, save_best_only=True)
-        rs = LambdaCallback(on_epoch_end=lambda epoch, logs: model_error.reset_states())
-        history = model_error.fit(trainX, trainY, epochs=200, batch_size=batch_size, verbose=2, callbacks=[es, mc, rs], shuffle=False)
-
-        trainPredict = model_error.predict(trainX, batch_size = batch_size)
-        trainScore = math.sqrt(mean_squared_error(trainY, trainPredict))
-        print("Train Score: {} RMSE".format(trainScore))
-
-        model = [model_state, model_error]
-
         return model
 
     def train(self, trainFunctions):
@@ -300,49 +286,39 @@ class Model:
             model = self.trainShape(value, model)
 
     def load(self):
-        model_orig = load_model("model_state.h5")
+        model_orig = load_model("model.h5")
         batch_size = 1
+        lagWindowSize = self.lagWindowSize
+        numFeaturesState = self.numFeaturesState
+        numFeaturesError = self.numFeaturesError
         # re-define model
-        model = Sequential()
-        model.add(LSTM(model_orig.layers[0].units, batch_input_shape=(batch_size, 1, model_orig.input_shape[2]), stateful=True))
-        model.add(Dense(model_orig.layers[1].units))
-        model.set_weights(model_orig.get_weights())
-        # compile model
-        model.compile(loss='mean_squared_error', optimizer='adam')
-        self.model_state = model
+        input1 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesState))
+        lstm1 = LSTM(10, stateful=True)(input1)
+        output1 = Dense(numFeaturesState)(lstm1)
 
-        model_orig = load_model("model_error.h5")
-        batch_size = 1
-        # re-define model
-        model = Sequential()
-        model.add(LSTM(model_orig.layers[0].units, batch_input_shape=(batch_size, 1, model_orig.input_shape[2]), stateful=True))
-        model.add(Dense(model_orig.layers[1].units))
-        model.set_weights(model_orig.get_weights())
-        # compile model
-        model.compile(loss='mean_squared_error', optimizer='adam')
-        self.model_error = model
+        input2 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesError))
+        lstm2 = LSTM(20, stateful=True)(input2)
+        output2 = Dense(numFeaturesError)(lstm2)
 
-        self.scalerX = pkl.load(open("scalerX.p", "rb"))
-        self.scalerY = pkl.load(open("scalerY.p", "rb"))
+        model = Model(inputs=[input1, input2], outputs=[output1, output2])
+        # Transfer learned weights
+        model.set_weights(model_orig.get_weights())
+        model.compile(loss='mse', optimizer='adam')
+
+        self.model = model
+        self.scaler = pkl.load(open("scaler.p", "rb"))
+
 
     def predict(self, data):
         s, p = data
         # return s, p
-        data = np.array([[*s, *np.reshape(p, (9))]])
-        data = self.scalerX.transform(data)
 
-        testX = data[:,0:3]
-        s_e = self.model_state.predict(np.reshape(testX, (testX.shape[0], 1, testX.shape[1])),
-                    batch_size = 1)[0]
+        X, Y = self.processData([data], learn=False)
+        scaled_predict = self.model.predict(X, batch_size = 1)
+        predict = self.scaler.inverse_transform(np.hstack(scaled_predict))[0]
 
-        testX = data[:,3:]
-        p_e = self.model_error.predict(np.reshape(testX, (testX.shape[0], 1, testX.shape[1])),
-                                         batch_size=1)[0]
-
-        data_e = [[*s_e, *p_e]]
-        data_e = self.scalerY.inverse_transform(data_e)[0]
-        s_e = data_e[0:3]
-        p_e = data_e[3:]
+        s_e = predict[0:self.numFeaturesState]
+        p_e = predict[self.numFeaturesState:]
         p_e = np.reshape(p_e, (3, 3))
 
         return s_e, p_e
@@ -350,25 +326,21 @@ class Model:
     def evaluate(self, functionNames):
         shapesData = pkl.load(open('shapesData.p', 'rb'))
         for name in functionNames:
-            dataset = shapesData[name]
-
-
-            trainX, trainY = self.processData(dataset, scaleY=False)
-
-
-            np.random.seed(7)
-
+            dataset = shapesData[name].to_numpy()
             trainPredict = []
-            for x in trainX:
-                s = x[0:3]
-                p = np.reshape(x[3:], (3,3))
-                s_e, p_e = self.predict([s,p])
-                trainPredict.append([*s_e,*np.reshape(p_e, (9))])
+            for x in dataset:
+                s_e, p_e = self.predict(x)
+                trainPredict.append([s_e, p_e])
 
+            #Score
+            dataset = dataset[1:] #Shift by one.
+            trainPredict = trainPredict[:-1] # Cant score last prediction
 
-            trainPredict = np.array(trainPredict)
+            dataset = [[*x[0], *x[1].flatten()] for x in dataset]
+            trainPredict = [[*x[0], *x[1][0], *x[1][1], *x[1][2]] for x in trainPredict]
 
-            trainScore = math.sqrt(mean_squared_error(trainY, trainPredict_invScaled))
+            trainScore = [sqrt(x) for x in
+                          mean_squared_error(dataset, trainPredict, multioutput='raw_values')]
             print("Evaluate Score for shape {}: {} RMSE".format(name, trainScore))
 
 class Experiment:
@@ -377,8 +349,8 @@ class Experiment:
         # self.allShapes = [Shape(x) for x in self.params.functions if x.name in ['elipse']]
 
     def collect(self):
-        params = params.Params()
-        allShapes = [Shape(x) for x in params.functions]
+        p = params.Params()
+        allShapes = [Shape(x) for x in p.functions]
         shapesData = pd.Series(dtype='object')
         for shape in allShapes:
             data = shape.trace()
@@ -388,7 +360,7 @@ class Experiment:
     def train(self):
         shapesData = pkl.load(open("shapesData.p", "rb"))
         trainShapes = [x for x in shapesData.keys() if x not in ['elipse_1']]
-        model = Model()
+        model = MotionControlModel()
         model.train(trainShapes)
 
     def test(self):
@@ -404,10 +376,10 @@ if True or __name__ == "__main__":
     experiment = Experiment()
     # experiment.collect()
     # experiment.train()
-    experiment.test()
-    pltVar.plot()
-    # model = Model(loadModel=True)
-    # model.evaluate(["elipse"])
+    # experiment.test()
+    # pltVar.plot()
+    model = MotionControlModel(loadModel=True)
+    model.evaluate(["elipse_1"])
 
 
 
