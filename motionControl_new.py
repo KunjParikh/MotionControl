@@ -275,8 +275,9 @@ class MotionControlModel:
 
         return X, Y
 
-    def trainShape(self, dataset, model=False):
+    def trainShape(self, dataset, validationData, model=False):
         X, Y = self.processData(dataset)
+        vX, vY = self.processData(validationData)
 
         numFeaturesState = self.numFeaturesState
         numFeaturesStateAdded = self.numFeaturesStateAdded
@@ -286,6 +287,9 @@ class MotionControlModel:
         bs = floor(X[0].shape[0] / batch_size) * batch_size
         X = [X[0][:bs,:,:], X[1][:bs,:,:]]
         Y = [Y[0][:bs, :], Y[1][:bs, :]]
+
+        vX = [vX[0][:bs, :, :], vX[1][:bs, :, :]]
+        vY = [vY[0][:bs, :], vY[1][:bs, :]]
 
         lagWindowSize = self.lagWindowSize
         if model == False:
@@ -301,11 +305,12 @@ class MotionControlModel:
             model.compile(loss='mse', optimizer='adam')
             plot_model(model, show_shapes=True, to_file='model.png')
 
-        es = EarlyStopping(monitor='dense_state_loss', mode='min', verbose=1, patience=40)
+        es = EarlyStopping(monitor='val_dense_state_loss', mode='min', verbose=1, patience=40)
         mc = ModelCheckpoint(os.path.join(self.rootpath, "model.h5"),
-            monitor='dense_state_loss', mode='min', verbose=1, save_best_only=True)
+            monitor='val_dense_state_loss', mode='min', verbose=1, save_best_only=True)
         rs = LambdaCallback(on_epoch_end=lambda epoch, logs: model.reset_states())
-        history = model.fit(X, Y, epochs=200, batch_size=batch_size, verbose=2, callbacks=[es, mc, rs], shuffle=False)
+        history = model.fit(X, Y, epochs=200, batch_size=batch_size, verbose=2, callbacks=[es, mc, rs], shuffle=False,
+                            validation_data=(vX, vY))
 
         trainPredict = model.predict(X, batch_size = batch_size)
         trainScore = [sqrt(x) for x in  mean_squared_error(np.hstack(Y), np.hstack(trainPredict), multioutput='raw_values')]
@@ -315,11 +320,12 @@ class MotionControlModel:
     def train(self, trainFunctions):
         shapesData = pkl.load(open('shapesData.p', 'rb'))
         model = False
+        validationData = shapesData["elipse_1"]
 
         for name in trainFunctions:
             value = shapesData[name]
             print("Training State for {} shape".format(name))
-            model = self.trainShape(value, model)
+            model = self.trainShape(value, validationData, model)
 
     def load(self):
         model_orig = load_model("model.h5")
@@ -404,7 +410,7 @@ class Experiment:
         # trainShapes = [x for x in shapesData.keys() if
         #                x in ['circle_4_1', 'circle_6_1', 'elipse_1', 'irregular1_1', 'irregular2_1'
         #                      ]]
-        trainShapes = ['irregular2_1', 'irregular1_1', 'elipse_1', 'circle_6_1', 'circle_4_1'
+        trainShapes = ['irregular2_1', 'irregular1_1', 'irregular1_8', 'circle_6_1', 'circle_4_1'
                              ]
         # trainShapes = [x for x in shapesData.keys() if x in ['elipse_1']]
         model = MotionControlModel()
@@ -413,7 +419,7 @@ class Experiment:
     def test(self):
         shapesData = pkl.load(open("shapesData.p", "rb"))
         testNames = [x for x in shapesData.keys() if
-                       x in ['circle_1', 'irregular2_1'
+                       x in ['circle_1', 'irregular2_1', 'elipse_1'
                              ]]
         # testNames = [x for x in shapesData.keys() if x in ['elipse_1']]
         fg = params.FunctionGenerator()
