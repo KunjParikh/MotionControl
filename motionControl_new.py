@@ -1,5 +1,5 @@
 import matplotlib
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import params as params
 from formationCenter import formationCenter
@@ -24,7 +24,8 @@ from keras.callbacks import EarlyStopping
 from keras.callbacks import ModelCheckpoint
 from keras.callbacks import LambdaCallback
 import os
-from math import sqrt
+import sys
+from math import sqrt, floor
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import MinMaxScaler
 from keras.models import load_model
@@ -32,7 +33,6 @@ from utils import PlotVariables
 from keras.utils.vis_utils import plot_model
 from statistics import mean
 
-pltVar = PlotVariables('shape', ["z", "dz_x", "dz_y"])
 
 def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian, model = False):
 
@@ -115,15 +115,11 @@ class Shape:
         if model:
             z_c_k, dz_c_k, p_k, data = kalmanFilter(z_c, dz_c, r, z_r, r_c, r_c_old, p, hessian)
             z_c_p, dz_c_p, p_p, data = kalmanFilter(z_c, dz_c, r, z_r, r_c, r_c_old, p, hessian, model)
-            # var1.push(z_c_k, z_c_p)
-            # var2.push(dz_c_k[0], dz_c_p[0])
-            # var3.push(dz_c_k[1], dz_c_p[1])
+
             z_c = z_c_p
             dz_c = dz_c_p
             p = p_p
-            pltVar.push('z', z_c_k, z_c_p)
-            pltVar.push('dz_x', dz_c_k[0], dz_c_p[0])
-            pltVar.push('dz_y', dz_c_k[1], dz_c_p[1])
+
         else:
             z_c, dz_c, p, data = kalmanFilter(z_c, dz_c, r, z_r, r_c, r_c_old, p, hessian)
         # z_c = f(r_c[0], r_c[1])
@@ -132,13 +128,8 @@ class Shape:
         r_c_old = r_c
         r_c, x_2, y_2 = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2,
                                            self.function.mu_f, self.function.z_desired)
-        r_c_p, x_2_p, y_2_p = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2,
-                                           self.function.mu_f, self.function.z_desired)
-
-
 
         r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q)
-        # pltVar.push('z_c', mean(np.array([self.function.f(*pt) for pt in r])), z_c)
 
         state = [r_c, z_c, dz_c, r_c_old, p, r, q, dq, u_r, vel_q, x_2, y_2]
         # data = [r_c, z_c, dz_c, hessian, r, z_r, p]
@@ -163,16 +154,25 @@ class Shape:
             p_det.append(np.linalg.det(state[4]))
             if i % 150 == 0:
                 r_plot.append(state[5])
+        dataframe = pd.DataFrame(data, columns=['s', 'p'])
 
-        dataframe = pd.DataFrame(data, columns = ['s', 'p'])
-        # dataframe = pd.concat([pd.DataFrame([i], columns=['s', 'p']) for i in data], ignore_index=True)
+        if model:
+            cmpData = []
+            state = [self.r_c, self.z_c, self.dz_c, self.r_c_old, self.p, self.r,
+                     self.q, self.dq, self.u_r, self.vel_q, self.x_2, self.y_2]
+            for i in range(10000):
+                state, d = self.step(state)
+                cmpData.append(d)
+            cmpDataframe = pd.DataFrame(cmpData, columns=['s', 'p'])
+        else:
+            cmpDataframe = False
 
         self.plot(r_c_plot, r_plot)
-        return dataframe
+        return dataframe, cmpDataframe
 
     def simulate(self):
         model = MotionControlModel(loadModel=True)
-        self.trace(model)
+        return self.trace(model)
 
     def plot(self, r_c_plot, r_plot):
         x = np.linspace(-10, 10, 200)
@@ -193,15 +193,19 @@ class Shape:
 class MotionControlModel:
     def __init__(self, loadModel=False):
 
-        self.rootpath = "/tmp"
+        self.rootpath = "/tmp" if os.name=='posix' else ""
         self.model = False
         self.scalerX = False
         self.scalerY = False
 
+        self.numFeaturesStateAdded = 3
         self.numFeaturesState = 3
         self.numFeaturesError = 9
-        self.lagWindowSize = 10
-        self.history = np.zeros((10, 3+9)).tolist()
+        self.lagWindowSize = 50
+        self.history = np.zeros((self.lagWindowSize, self.numFeaturesStateAdded+self.numFeaturesError)).tolist()
+
+        self.lstmStateSize = 40
+        self.lstmErrorSize = 20
 
         if loadModel:
             self.load()
@@ -215,31 +219,58 @@ class MotionControlModel:
                             x[1][0][0], x[1][0][1], x[1][0][2], x[1][1][0], x[1][1][1], x[1][1][2], x[1][2][0],
                             x[1][2][1], x[1][2][2]
                             ] for x in raw_data])
-        datalength = unscaled_data.shape[0]
 
-        if learn == False:
-            self.history.append(unscaled_data[0])
-            self.history = self.history[1:]
+        lagWindowSize = self.lagWindowSize
+        numFeaturesState = self.numFeaturesState
+        numFeaturesStateAdded = self.numFeaturesStateAdded
+
+        # if learn:
+        #     #Skip data while not on shape
+        #     # calculate summary statistics
+        #     data = unscaled_data[:,0]
+        #     data_mean, data_std = np.mean(data), np.std(data)
+        #     # identify outliers
+        #     cut_off = data_std * 3
+        #     lower, upper = data_mean - cut_off, data_mean + cut_off
+        #     # identify outliers
+        #     onShape = 0
+        #     for value in data:
+        #         if value < lower or value > upper:
+        #             onShape = onShape + 1
+        #         else:
+        #             break
+        #     # Instead of removing, add a parameter - holiday effect.
+        #     # unscaled_data = unscaled_data[onShape:,:]
+        #     datalength = unscaled_data.shape[0]
+        #     onShape = np.array([*np.zeros((onShape)), *np.ones((datalength-onShape))])
+        #     onShape = np.reshape(onShape, (datalength, 1))
+        #     unscaled_data = np.hstack((unscaled_data[:,0:numFeaturesState], onShape, unscaled_data[:,numFeaturesState:]))
+        # else:
+        #     onShape = np.array([[1]])
+        #     unscaled_data = np.hstack(
+        #         (unscaled_data[:, 0:numFeaturesState], onShape, unscaled_data[:, numFeaturesState:]))
+
+        datalength = unscaled_data.shape[0]
 
         if learn:
             scaler = MinMaxScaler(feature_range=(-1, 1))
             scaled_data = scaler.fit_transform(unscaled_data)
             pkl.dump(scaler, open("scaler.p", "wb"))
         else:
+            self.history.append(unscaled_data[0])
+            self.history = self.history[1:]
             scaled_data = self.scaler.transform(self.history)
-
-        lagWindowSize = self.lagWindowSize
-        numFeaturesState = self.numFeaturesState
 
         # LSTM needs input in [samples, timestep, features] format.
         if learn:
             X = np.array([scaled_data[i-lagWindowSize:i,:] for i in range(lagWindowSize, datalength)])
             Y = scaled_data[lagWindowSize:,:]
-            X = [X[:, :, 0:numFeaturesState], X[:, :, numFeaturesState:]]
-            Y = [Y[:, 0:numFeaturesState], Y[:, numFeaturesState:]]
+            X = [X[:, :, 0:numFeaturesStateAdded], X[:, :, numFeaturesStateAdded:]]
+            # We dont need 4th parameter for prediction so -1
+            Y = [Y[:, 0:numFeaturesState], Y[:, numFeaturesStateAdded:]]
         else:
             X = np.array([scaled_data])
-            X = [X[:, :, 0:numFeaturesState], X[:, :, numFeaturesState:]]
+            X = [X[:, :, 0:numFeaturesStateAdded], X[:, :, numFeaturesStateAdded:]]
             Y = False
 
         return X, Y
@@ -248,26 +279,31 @@ class MotionControlModel:
         X, Y = self.processData(dataset)
 
         numFeaturesState = self.numFeaturesState
+        numFeaturesStateAdded = self.numFeaturesStateAdded
         numFeaturesError = self.numFeaturesError
 
-        batch_size = 10
-        lagWindowSize = 10
+        batch_size = 60
+        bs = floor(X[0].shape[0] / batch_size) * batch_size
+        X = [X[0][:bs,:,:], X[1][:bs,:,:]]
+        Y = [Y[0][:bs, :], Y[1][:bs, :]]
+
+        lagWindowSize = self.lagWindowSize
         if model == False:
-            input1 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesState))
-            lstm1 = LSTM(10, stateful=True)(input1)
-            output1 = Dense(numFeaturesState)(lstm1)
+            input1 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesStateAdded))
+            lstm1 = LSTM(self.lstmStateSize, stateful=False)(input1)
+            output1 = Dense(numFeaturesState, name='dense_state')(lstm1)
 
             input2 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesError))
-            lstm2 = LSTM(20, stateful=True)(input2)
-            output2 = Dense(numFeaturesError)(lstm2)
+            lstm2 = LSTM(self.lstmErrorSize, stateful=False)(input2)
+            output2 = Dense(numFeaturesError, name='dense_error')(lstm2)
 
             model = Model(inputs=[input1, input2], outputs=[output1, output2])
             model.compile(loss='mse', optimizer='adam')
             plot_model(model, show_shapes=True, to_file='model.png')
 
-        es = EarlyStopping(monitor='loss', mode='min', verbose=1, patience=20)
+        es = EarlyStopping(monitor='dense_state_loss', mode='min', verbose=1, patience=40)
         mc = ModelCheckpoint(os.path.join(self.rootpath, "model.h5"),
-            monitor='loss', mode='min', verbose=1, save_best_only=True)
+            monitor='dense_state_loss', mode='min', verbose=1, save_best_only=True)
         rs = LambdaCallback(on_epoch_end=lambda epoch, logs: model.reset_states())
         history = model.fit(X, Y, epochs=200, batch_size=batch_size, verbose=2, callbacks=[es, mc, rs], shuffle=False)
 
@@ -290,14 +326,15 @@ class MotionControlModel:
         batch_size = 1
         lagWindowSize = self.lagWindowSize
         numFeaturesState = self.numFeaturesState
+        numFeaturesStateAdded = self.numFeaturesStateAdded
         numFeaturesError = self.numFeaturesError
         # re-define model
-        input1 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesState))
-        lstm1 = LSTM(10, stateful=True)(input1)
+        input1 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesStateAdded))
+        lstm1 = LSTM(self.lstmStateSize, stateful=True)(input1)
         output1 = Dense(numFeaturesState)(lstm1)
 
         input2 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesError))
-        lstm2 = LSTM(20, stateful=True)(input2)
+        lstm2 = LSTM(self.lstmErrorSize, stateful=True)(input2)
         output2 = Dense(numFeaturesError)(lstm2)
 
         model = Model(inputs=[input1, input2], outputs=[output1, output2])
@@ -315,10 +352,14 @@ class MotionControlModel:
 
         X, Y = self.processData([data], learn=False)
         scaled_predict = self.model.predict(X, batch_size = 1)
-        predict = self.scaler.inverse_transform(np.hstack(scaled_predict))[0]
+        if self.numFeaturesStateAdded > self.numFeaturesState:
+            scaled_predict = np.hstack((scaled_predict[0], [[1]], scaled_predict[1]))
+        else:
+            scaled_predict = np.hstack((scaled_predict[0], scaled_predict[1]))
+        predict = self.scaler.inverse_transform(scaled_predict)[0]
 
         s_e = predict[0:self.numFeaturesState]
-        p_e = predict[self.numFeaturesState:]
+        p_e = predict[self.numFeaturesStateAdded:]
         p_e = np.reshape(p_e, (3, 3))
 
         return s_e, p_e
@@ -330,6 +371,7 @@ class MotionControlModel:
             trainPredict = []
             for x in dataset:
                 s_e, p_e = self.predict(x)
+                # s_e, p_e = x
                 trainPredict.append([s_e, p_e])
 
             #Score
@@ -353,33 +395,52 @@ class Experiment:
         allShapes = [Shape(x) for x in p.functions]
         shapesData = pd.Series(dtype='object')
         for shape in allShapes:
-            data = shape.trace()
+            data, _ = shape.trace()
             shapesData = shapesData.append(pd.Series({shape.name: data}))
         pkl.dump(shapesData, open("shapesData.p", "wb"))
 
     def train(self):
         shapesData = pkl.load(open("shapesData.p", "rb"))
-        trainShapes = [x for x in shapesData.keys() if x not in ['elipse_1']]
+        # trainShapes = [x for x in shapesData.keys() if
+        #                x in ['circle_4_1', 'circle_6_1', 'elipse_1', 'irregular1_1', 'irregular2_1'
+        #                      ]]
+        trainShapes = ['irregular2_1', 'irregular1_1', 'elipse_1', 'circle_6_1', 'circle_4_1'
+                             ]
+        # trainShapes = [x for x in shapesData.keys() if x in ['elipse_1']]
         model = MotionControlModel()
         model.train(trainShapes)
 
     def test(self):
         shapesData = pkl.load(open("shapesData.p", "rb"))
-        testNames = [x for x in shapesData.keys() if x in ['irregular1_8']]
-        # testNames = [x for x in shapesData.keys()]
+        testNames = [x for x in shapesData.keys() if
+                       x in ['circle_1', 'irregular2_1'
+                             ]]
+        # testNames = [x for x in shapesData.keys() if x in ['elipse_1']]
         fg = params.FunctionGenerator()
         testShapes = [Shape(fg.getFunction(name)) for name in testNames]
         for shape in testShapes:
-            shape.simulate()
+            df, refdf = shape.simulate()
+
+            pltVar = PlotVariables(shape.name, ["z", "dz_x", "dz_y"])
+            pltVar.set('z', refdf['s'].apply(lambda x: x[0]).to_numpy(),
+                       df['s'].apply(lambda x: x[0]).to_numpy())
+            pltVar.set('dz_x', refdf['s'].apply(lambda x: x[1]).to_numpy(),
+                       df['s'].apply(lambda x: x[1]).to_numpy())
+            pltVar.set('dz_y', refdf['s'].apply(lambda x: x[2]).to_numpy(),
+                       df['s'].apply(lambda x: x[2]).to_numpy())
+            pltVar.plot()
+
 
 if True or __name__ == "__main__":
     experiment = Experiment()
-    # experiment.collect()
-    # experiment.train()
-    # experiment.test()
-    # pltVar.plot()
-    model = MotionControlModel(loadModel=True)
-    model.evaluate(["elipse_1"])
-
-
-
+    if 'collect' in sys.argv:
+        experiment.collect()
+    if 'train'in sys.argv:
+        experiment.train()
+    if 'test'in sys.argv:
+        experiment.test()
+    if 'evaluate' in sys.argv:
+        model = MotionControlModel(loadModel=True)
+        shapesData = pkl.load(open("shapesData.p", "rb"))
+        testNames = shapesData.keys()
+        model.evaluate(testNames)
