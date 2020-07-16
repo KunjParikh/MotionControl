@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error
+from math import sqrt
 
 class PlotVariables:
     def __init__(self, id, names):
@@ -8,6 +10,9 @@ class PlotVariables:
 
     def push(self, name, value, value2=False, value3=False, value4=False):
         self.vars[name].push(value, value2, value3, value4)
+
+    def set(self, name, value, value2=False, value3=False, value4=False):
+        self.vars[name].set(value, value2, value3, value4)
 
     def plot(self):
         plt.figure()
@@ -18,8 +23,10 @@ class PlotVariables:
             self.vars[k].plot()
             i = i + 1
 
+
         plt.savefig("utils_plot_{}.pdf".format(self.id), bbox_inches='tight')
         plt.close()
+
 
 class PlotVariable:
     def __init__(self, name):
@@ -38,6 +45,15 @@ class PlotVariable:
         if value4:
             self.value4 = np.append(self.value4, value4)
 
+    def set(self, value, value2=False, value3=False, value4=False):
+        self.value = value
+        if type(value2) is np.ndarray:
+            self.value2 = value2
+        if type(value3) is np.ndarray:
+            self.value3 = value3
+        if type(value4) is np.ndarray:
+            self.value4 = value4
+
     def print(self):
         print(self.value)
 
@@ -50,7 +66,10 @@ class PlotVariable:
         if self.value4.shape[0] > 0:
             plt.plot(self.value4, 'y')
         plt.title(self.name)
+
         # plt.show()
+        score = sqrt(mean_squared_error(self.value, self.value2))
+        print("RMSE for shape {}: {} RMSE, Max: {}, Min: {}".format(self.name, score, np.max(self.value), np.min(self.value)))
 
 
 if __name__ == "__main__":
