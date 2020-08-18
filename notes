@@ -104,4 +104,107 @@ MAIN
 21) Try out simpler models for time-series analysis. eg. ARIMA, VAR, Baysean linear regression, Kernel Trick for non-linear.
     https://otexts.com/fpp2/nnetar.html
 
-22) Maybe we need less number of robots as we are training using past. 
+22) Maybe we need less number of robots as we are training using past.
+
+
+
+ ****Running Notes****
+ - only record time-series [se] dont worry about se_out.
+- try persistance model.
+- try arima - remove seasonality - need to figure out period.
+- maybe plot data in various ways.
+- For multivariate (2) and 3 lag, we get 6 flat features to train each sample.
+- Multi-headed MLP model - Keras functional API and contatenate. For multivariate multiseries - maybe multi-output MLP (not multi-headed) - upto Dense(100) single MLP and then branch 3 different MLP for 100-1 Dense
+- LSTM likes 200-400 time-steps only.
+
+
+- For CNN we dont need to flatten multivariate. > It wants [samples, timesteps, features].
+
+- r_c_x = OK to flat
+- r_c_y = OK to flat
+- x_2[0] = distubred.
+- z_c = minor wave to flat.
+- Only dz_c is causing problem.
+- dz_x and dz_y are flattening to 0 with small noise, actually dz_x and dz_y should oscilate. The flattening is before one period is complete.
+
+- True time series does a few multi-step prediction, but needs new measurements to predict further. How do we truely measure z and dz here? Truely means on trajectory - not the wrong trajectory.
+
+- Give multiple timesteps to LSTM
+
+
+Maybe two LSTMs one until we reach shape, another for tracking the shape.
+Maybe resample to take less points (bec lagWindow of 50 might be too small)
+
+- How to do cross validation here?
+
+
+
+Seconds to predict
+FARM + compile: 81 + 13
+CPU - 263
+FARM + nocomple: 78 + 13
+
+Agenda for 7/16:
+Review
+- Books content
+	- LSTM time-steps
+- data-Plots
+- code train/test
+	- Function generator
+- Simulation plots
+- Excel results
+Questions
+- How to incorporate how many robots
+- For ARIMA, need to remove seasonality, how to figure out period?
+- How to improve lstm results
+ - Currently validation on elipse.
+
+*******************
+Traced value error for function circle = 0.006285318974847205
+Traced value error for function circle_4 = 3.758959105226006
+Traced value error for function circle_6 = 17607.13157964592
+Traced value error for function elipse = 0.012274183576813712
+Traced value error for function irregular1 = 314.22640580456226
+Traced value error for function irregular2 = 72.04074731177178
+
+
+Traced value function circle: Error = 0.7340520823670051, NumPoints close to curve = 9755
+Traced value function circle_4: No Convergence
+Traced value function circle_6: No Convergence
+Traced value function elipse: Error = 6505.452306672628, NumPoints close to curve = 9735
+Traced value function irregular1: Error = 4208.32815551853, NumPoints close to curve = 9708
+Traced value function irregular2: Error = 5117.111477502813, NumPoints close to curve = 9923
+
+Traced value function circle: Error = 0.0171947724520012, NumPoints close to curve = 9754
+Traced value function circle_4: Error = 28.528287343450497, NumPoints close to curve = 9470
+Traced value function circle_6: No Convergence
+Traced value function elipse: Error = 0.10324684262286755, NumPoints close to curve = 9715
+Traced value function irregular1: Error = 955.2744618751894, NumPoints close to curve = 9820
+Traced value function irregular2: Error = 208.4279221677394, NumPoints close to curve = 9940
+
+Traced value function circle: Error = 0.007931020572338113, NumPoints close to curve = 9614
+Traced value function circle_4: Error = 218.03533665310223, NumPoints close to curve = 9416
+Traced value function circle_6: No Convergence
+Traced value function elipse: Error = 0.012151589468120597, NumPoints close to curve = 9700
+Traced value function irregular1: Error = 465.14632426931223, NumPoints close to curve = 9814
+Traced value function irregular2: Error = 626.4477528209123, NumPoints close to curve = 9936
+
+Latest code : 4/18 : Without rhombus
+Traced value function circle: Error = 3.894430318552367, NumPoints close to curve = 9738
+Traced value function circle_4: Error = 1439.9847793930433, NumPoints close to curve = 9558
+Traced value function circle_6: No Convergence
+Traced value function elipse: Error = 6352.565120326876, NumPoints close to curve = 9669
+Traced value function irregular1: Error = 1992.4122703598935, NumPoints close to curve = 9401
+Traced value function irregular2: Error = 4034.36551684198, NumPoints close to curve = 9934
+
+Using Kalman values:
+Traced value function irregular2: Error = 56.02744177037145, NumPoints close to curve = 9937
+
+Latest code : 4/18 : With rhombus
+Traced value function circle: Error = 0.021478531687978756, NumPoints close to curve = 9761
+Traced value function circle_4: No Convergence
+Traced value function circle_6: Error = 757074.0885078652, NumPoints close to curve = 9127
+Traced value function elipse: Error = 0.008633160943013661, NumPoints close to curve = 9718
+Traced value function irregular1: Error = 52.643149053354755, NumPoints close to curve = 9816
+Traced value function irregular2: Error = 94.92106653432565, NumPoints close to curve = 9938
+Traced value function rhombus: Error = 0.002644931721733885, NumPoints close to curve = 9896
