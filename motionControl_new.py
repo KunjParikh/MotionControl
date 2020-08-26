@@ -32,6 +32,7 @@ from keras.models import load_model
 from utils import PlotVariables
 from keras.utils.vis_utils import plot_model
 from statistics import mean
+import time
 
 
 def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian, model = False):
@@ -113,7 +114,7 @@ class Shape:
         hessian = self.function.hessian_f(r_c[0], r_c[1]) #True value
 
         if model:
-            z_c_k, dz_c_k, p_k, data = kalmanFilter(z_c, dz_c, r, z_r, r_c, r_c_old, p, hessian)
+            # z_c_k, dz_c_k, p_k, data = kalmanFilter(z_c, dz_c, r, z_r, r_c, r_c_old, p, hessian)
             z_c_p, dz_c_p, p_p, data = kalmanFilter(z_c, dz_c, r, z_r, r_c, r_c_old, p, hessian, model)
 
             z_c = z_c_p
@@ -146,7 +147,7 @@ class Shape:
 
         state = [self.r_c, self.z_c, self.dz_c, self.r_c_old, self.p, self.r,
                  self.q, self.dq, self.u_r, self.vel_q, self.x_2, self.y_2]
-
+        # print("Shape:trace:1: {}".format(time.time()))
         for i in range(10000):
             state, d = self.step(state, model)
             data.append(d)
@@ -155,7 +156,7 @@ class Shape:
             if i % 150 == 0:
                 r_plot.append(state[5])
         dataframe = pd.DataFrame(data, columns=['s', 'p'])
-
+        # print("Shape:trace:2: {}".format(time.time()))
         if model:
             cmpData = []
             state = [self.r_c, self.z_c, self.dz_c, self.r_c_old, self.p, self.r,
@@ -166,7 +167,7 @@ class Shape:
             cmpDataframe = pd.DataFrame(cmpData, columns=['s', 'p'])
         else:
             cmpDataframe = False
-
+        # print("Shape:trace:3: {}".format(time.time()))
         self.plot(r_c_plot, r_plot)
         return dataframe, cmpDataframe
 
@@ -321,10 +322,12 @@ class MotionControlModel:
         shapesData = pkl.load(open('shapesData.p', 'rb'))
         model = False
         validationData = shapesData["elipse_1"]
+        # validationData = validationData.iloc[::1, :]
 
         for name in trainFunctions:
             value = shapesData[name]
             print("Training State for {} shape".format(name))
+            # value = value.iloc[::1, :]
             model = self.trainShape(value, validationData, model)
 
     def load(self):
@@ -346,7 +349,7 @@ class MotionControlModel:
         model = Model(inputs=[input1, input2], outputs=[output1, output2])
         # Transfer learned weights
         model.set_weights(model_orig.get_weights())
-        model.compile(loss='mse', optimizer='adam')
+        # model.compile(loss='mse', optimizer='adam')
 
         self.model = model
         self.scaler = pkl.load(open("scaler.p", "rb"))
@@ -407,20 +410,26 @@ class Experiment:
 
     def train(self):
         shapesData = pkl.load(open("shapesData.p", "rb"))
-        # trainShapes = [x for x in shapesData.keys() if
-        #                x in ['circle_4_1', 'circle_6_1', 'elipse_1', 'irregular1_1', 'irregular2_1'
-        #                      ]]
-        trainShapes = ['irregular2_1', 'irregular1_1', 'irregular1_8', 'circle_6_1', 'circle_4_1'
-                             ]
-        # trainShapes = [x for x in shapesData.keys() if x in ['elipse_1']]
+        # trainShapes = ['irregular2_1', 'irregular1_1', 'irregular1_8', 'circle_6_1', 'circle_4_1']
+        trainShapes = ['circle_4_1', 'circle_6_1', 'irregular1_1',
+             'irregular2_1', 'irregular1_9', 'circle_4_8',
+             'circle_3',
+             'circle_4', 'circle_7',
+             'irregular2_2', 'circle_6', 'irregular1_8', 'circle_10', 'circle_4_7',
+             'circle_2', 'circle_6_8']
         model = MotionControlModel()
         model.train(trainShapes)
 
     def test(self):
         shapesData = pkl.load(open("shapesData.p", "rb"))
-        testNames = [x for x in shapesData.keys() if
-                       x in ['circle_1', 'irregular2_1', 'elipse_1'
-                             ]]
+        # testNames = ['circle_1', 'irregular2_8', 'elipse_1'
+        testNames = ['circle_1', 'circle_4_1', 'circle_6_1', 'elipse_1', 'irregular1_1',
+             'irregular2_1', 'irregular1_9', 'circle_4_8',
+             'elipse_6', 'irregular2_8', 'elipse_9', 'elipse_8', 'circle_3',
+             'elipse_2', 'circle_4', 'elipse_5', 'circle_7', 'elipse_3',
+             'irregular2_2', 'circle_6', 'irregular1_8', 'circle_10', 'circle_4_7',
+             'circle_2', 'circle_6_8']
+
         # testNames = [x for x in shapesData.keys() if x in ['elipse_1']]
         fg = params.FunctionGenerator()
         testShapes = [Shape(fg.getFunction(name)) for name in testNames]
@@ -435,7 +444,6 @@ class Experiment:
             pltVar.set('dz_y', refdf['s'].apply(lambda x: x[2]).to_numpy(),
                        df['s'].apply(lambda x: x[2]).to_numpy())
             pltVar.plot()
-
 
 if True or __name__ == "__main__":
     experiment = Experiment()
