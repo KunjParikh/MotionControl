@@ -14,7 +14,7 @@ class Function:
 
 class FunctionGenerator:
     def generate(self, num):
-        flist = [*2*['circle'], 'circle_4', 'circle_6', *3*['elipse'], *2*['irregular1'], 'irregular2', 'rhombus']
+        flist = [*2*['circle'], 'circle_4', 'circle_6', *3*['elipse'], *2*['irregular1'], 'irregular2']
         randlist = [p for p in range(2, 11)]
         # rand = random.random() * 10
 
@@ -115,13 +115,13 @@ class Params:
             fg.circle_6(1),
             fg.elipse(1),
             fg.irregular1(1),
-            fg.irregular2(1),
-            fg.rhombus(1)
+            fg.irregular2(1)
+            # fg.rhombus(1)
         ]
-        self.functions.extend(fg.generate(20))
+        # self.functions.extend(fg.generate(20))
 
         # Parameters - Formation Control
-        self.numSensors = 4
+        self.numSensors = 2 # 4
         self.a = 0.6
         self.b = 0.6
         self.K2 = 6000
@@ -132,16 +132,6 @@ class Params:
         # self.mu_f = 10  #Convereted to mu_f_list because different for shapes
         self.K4 = 40
 
-        # Utilities: Formation Control
-        self.phi = np.array(
-            [[1 / 4, 1 / 4, 1 / 4, 1 / 4],
-             [-1 / np.sqrt(2), 1 / np.sqrt(2), 0, 0],
-             [0, 0, 1 / np.sqrt(2), -1 / np.sqrt(2)],
-             [-1 / 2, -1 / 2, 1 / 2, 1 / 2]
-             ])
-
-        self.phi_inv = np.linalg.inv(self.phi)
-
         # Utilities: Formation Center
         self.rotateRight = np.array([[cos(pi / 2), -sin(pi / 2)],
                                      [sin(pi / 2), cos(pi / 2)]])
@@ -149,14 +139,38 @@ class Params:
         self.rotateLeft = np.array([[cos(-pi / 2), -sin(-pi / 2)],
                                     [sin(-pi / 2), cos(-pi / 2)]])
 
-        # Initialial variables
+        # Initial variables
         self.r_c = np.array([-2, -6])
 
-        self.r = np.array(
-            [self.r_c + [1, 0],
-             self.r_c + [-1, 0],
-             self.r_c + [0, -1],
-             self.r_c + [0, 1]])
+        # Utilities: Formation Control
+        if self.numSensors == 4:
+            self.phi = np.array(
+                [[1 / 4, 1 / 4, 1 / 4, 1 / 4],
+                 [-1 / np.sqrt(2), 1 / np.sqrt(2), 0, 0],
+                 [0, 0, 1 / np.sqrt(2), -1 / np.sqrt(2)],
+                 [-1 / 2, -1 / 2, 1 / 2, 1 / 2]
+                 ])
+
+            self.phi_inv = np.linalg.inv(self.phi)
+
+            self.r = np.array(
+                [self.r_c + [1, 0],
+                 self.r_c + [-1, 0],
+                 self.r_c + [0, -1],
+                 self.r_c + [0, 1]])
+
+        if self.numSensors == 2:
+            self.phi = np.array(
+                [[1 / 2, 1 / 2],
+                 [1 / np.sqrt(2), - 1 / np.sqrt(2)],
+                 ])
+
+            self.phi_inv = np.linalg.inv(self.phi)
+
+            self.r = np.array(
+                [self.r_c + [1, 0],
+                 self.r_c + [-1, 0]])
+
 
         # Jacobi vectors - formation control
         self.q = self.phi @ self.r

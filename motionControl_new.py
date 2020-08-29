@@ -106,7 +106,7 @@ class Shape:
         self.q, self.dq, self.u_r, self.vel_q = p.q, p.dq, p.u_r, p.vel_q
         self.p = np.zeros((3, 3))
 
-    def step(self, state, model=False):
+    def step(self, state, t, model=False):
         r_c, z_c, dz_c, r_c_old, p, r, q, dq, u_r, vel_q, x_2, y_2 = state
 
         #Inputs
@@ -127,10 +127,12 @@ class Shape:
         # dz_c = dz_f(r_c[0], r_c[1])
 
         r_c_old = r_c
+        # We dont need to calculate force. Velocity is sufficient.
+        # If we dont do this, fc only tracks gradient, not at desired field value, but where it was left to start with.
         r_c, x_2, y_2 = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2,
                                            self.function.mu_f, self.function.z_desired)
 
-        r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q)
+        r, q, dq, u_r, vel_q = formationControl(r_c, r, dz_c, q, dq, u_r, vel_q, t)
 
         state = [r_c, z_c, dz_c, r_c_old, p, r, q, dq, u_r, vel_q, x_2, y_2]
         # data = [r_c, z_c, dz_c, hessian, r, z_r, p]
@@ -149,7 +151,7 @@ class Shape:
                  self.q, self.dq, self.u_r, self.vel_q, self.x_2, self.y_2]
         # print("Shape:trace:1: {}".format(time.time()))
         for i in range(10000):
-            state, d = self.step(state, model)
+            state, d = self.step(state, i, model)
             data.append(d)
             r_c_plot.append(state[0])
             p_det.append(np.linalg.det(state[4]))
@@ -162,7 +164,7 @@ class Shape:
             state = [self.r_c, self.z_c, self.dz_c, self.r_c_old, self.p, self.r,
                      self.q, self.dq, self.u_r, self.vel_q, self.x_2, self.y_2]
             for i in range(10000):
-                state, d = self.step(state)
+                state, d = self.step(state, i)
                 cmpData.append(d)
             cmpDataframe = pd.DataFrame(cmpData, columns=['s', 'p'])
         else:
@@ -184,9 +186,13 @@ class Shape:
         plt.contour(x, y, Z, [self.function.z_desired])
         plt.plot(*zip(*r_c_plot), 'b')
         for r in r_plot:
-            plt.plot([r[0, 0], r[1, 0]], [r[0, 1], r[1, 1]], 'yo-')
-            plt.plot([r[2, 0], r[3, 0]], [r[2, 1], r[3, 1]], 'go-')
+            if r.shape[0] == 4:
+                plt.plot([r[0, 0], r[1, 0]], [r[0, 1], r[1, 1]], 'yo-')
+                plt.plot([r[2, 0], r[3, 0]], [r[2, 1], r[3, 1]], 'go-')
+            if r.shape[0] == 2:
+                plt.plot([r[0, 0], r[1, 0]], [r[0, 1], r[1, 1]], 'yo-')
         plt.title(self.name)
+        # plt.show()
         plt.savefig("{}.pdf".format(self.name), bbox_inches='tight')
         plt.close()
 
@@ -406,7 +412,7 @@ class Experiment:
         for shape in allShapes:
             data, _ = shape.trace()
             shapesData = shapesData.append(pd.Series({shape.name: data}))
-        pkl.dump(shapesData, open("shapesData.p", "wb"))
+        # pkl.dump(shapesData, open("shapesData.p", "wb"))
 
     def train(self):
         shapesData = pkl.load(open("shapesData.p", "rb"))

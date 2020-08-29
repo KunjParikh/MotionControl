@@ -93,6 +93,6 @@ def plotFunction(collectedData, shapeName):
     plt.show()
 
 shapesData = pkl.load(open("shapesData.p", "rb"))
-plotFunction(shapesData, "irregular1_1")
 plotFunction(shapesData, "circle_1")
 plotFunction(shapesData, "elipse_1")
+plotFunction(shapesData, "irregular1_1")
