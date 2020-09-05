@@ -217,6 +217,26 @@ class MotionControlModel:
         if loadModel:
             self.load()
 
+    def createModel(self, batch_size, stateful):
+        lagWindowSize = self.lagWindowSize
+        numFeaturesState = self.numFeaturesState
+        numFeaturesStateAdded = self.numFeaturesStateAdded
+        numFeaturesError = self.numFeaturesError
+        input1 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesStateAdded))
+        lstm1 = LSTM(self.lstmStateSize, stateful=stateful)(input1)
+        # lstm1 = LSTM(self.lstmStateSize, stateful=stateful, return_sequences=True)(input1)
+        # lstm3 = LSTM(self.lstmStateSize, stateful=stateful)(lstm1)
+        output1 = Dense(numFeaturesState, name='dense_state')(lstm1)
+
+        input2 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesError))
+        # lstm2 = LSTM(self.lstmErrorSize, stateful=stateful, return_sequences=True)(input2)
+        lstm2 = LSTM(self.lstmErrorSize, stateful=stateful)(input2)
+        # lstm4 = LSTM(self.lstmErrorSize, stateful=stateful)(lstm2)
+        output2 = Dense(numFeaturesError, name='dense_error')(lstm2)
+
+        model = Model(inputs=[input1, input2], outputs=[output1, output2])
+        return model
+
     def processData(self, df, learn=True):
         if isinstance(df, pd.DataFrame):
             raw_data = df.to_numpy()
@@ -286,10 +306,6 @@ class MotionControlModel:
         X, Y = self.processData(dataset)
         vX, vY = self.processData(validationData)
 
-        numFeaturesState = self.numFeaturesState
-        numFeaturesStateAdded = self.numFeaturesStateAdded
-        numFeaturesError = self.numFeaturesError
-
         batch_size = 60
         bs = floor(X[0].shape[0] / batch_size) * batch_size
         X = [X[0][:bs,:,:], X[1][:bs,:,:]]
@@ -298,17 +314,8 @@ class MotionControlModel:
         vX = [vX[0][:bs, :, :], vX[1][:bs, :, :]]
         vY = [vY[0][:bs, :], vY[1][:bs, :]]
 
-        lagWindowSize = self.lagWindowSize
         if model == False:
-            input1 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesStateAdded))
-            lstm1 = LSTM(self.lstmStateSize, stateful=False)(input1)
-            output1 = Dense(numFeaturesState, name='dense_state')(lstm1)
-
-            input2 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesError))
-            lstm2 = LSTM(self.lstmErrorSize, stateful=False)(input2)
-            output2 = Dense(numFeaturesError, name='dense_error')(lstm2)
-
-            model = Model(inputs=[input1, input2], outputs=[output1, output2])
+            model = self.createModel(batch_size=batch_size, stateful=True)
             model.compile(loss='mse', optimizer='adam')
             plot_model(model, show_shapes=True, to_file='model.png')
 
@@ -338,21 +345,8 @@ class MotionControlModel:
 
     def load(self):
         model_orig = load_model("model.h5")
-        batch_size = 1
-        lagWindowSize = self.lagWindowSize
-        numFeaturesState = self.numFeaturesState
-        numFeaturesStateAdded = self.numFeaturesStateAdded
-        numFeaturesError = self.numFeaturesError
         # re-define model
-        input1 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesStateAdded))
-        lstm1 = LSTM(self.lstmStateSize, stateful=True)(input1)
-        output1 = Dense(numFeaturesState)(lstm1)
-
-        input2 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesError))
-        lstm2 = LSTM(self.lstmErrorSize, stateful=True)(input2)
-        output2 = Dense(numFeaturesError)(lstm2)
-
-        model = Model(inputs=[input1, input2], outputs=[output1, output2])
+        model = self.createModel(batch_size=1, stateful=True)
         # Transfer learned weights
         model.set_weights(model_orig.get_weights())
         # model.compile(loss='mse', optimizer='adam')
@@ -406,9 +400,10 @@ class Experiment:
         # self.allShapes = [Shape(x) for x in self.params.functions if x.name in ['elipse']]
 
     def collect(self):
-        p = params.Params()
-        allShapes = [Shape(x) for x in p.functions]
         shapesData = pd.Series(dtype='object')
+        allNames = ['elipse_1']
+        fg = params.FunctionGenerator()
+        allShapes = [Shape(fg.getFunction(name)) for name in allNames]
         for shape in allShapes:
             data, _ = shape.trace()
             shapesData = shapesData.append(pd.Series({shape.name: data}))
@@ -423,6 +418,7 @@ class Experiment:
              'circle_4', 'circle_7',
              'irregular2_2', 'circle_6', 'irregular1_8', 'circle_10', 'circle_4_7',
              'circle_2', 'circle_6_8']
+        trainShapes = ['elipse_1']
         model = MotionControlModel()
         model.train(trainShapes)
 
@@ -435,8 +431,7 @@ class Experiment:
              'elipse_2', 'circle_4', 'elipse_5', 'circle_7', 'elipse_3',
              'irregular2_2', 'circle_6', 'irregular1_8', 'circle_10', 'circle_4_7',
              'circle_2', 'circle_6_8']
-
-        # testNames = [x for x in shapesData.keys() if x in ['elipse_1']]
+        testNames = ['elipse_1']
         fg = params.FunctionGenerator()
         testShapes = [Shape(fg.getFunction(name)) for name in testNames]
         for shape in testShapes:
