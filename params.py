@@ -34,7 +34,7 @@ class FunctionGenerator:
     def getFunction(self, name):
         nameParts = name.split("_")
         type = '_'.join(nameParts[:-1])
-        rand = float(nameParts[-1])
+        rand = int(nameParts[-1])
         method = getattr(self, type)
         return method(rand)
 
