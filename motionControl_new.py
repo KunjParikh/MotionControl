@@ -60,26 +60,15 @@ def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian, model = False):
         s_e, p_e = model.predict([s,p])
         if (p_e == np.zeros((3,3))).flatten().all():
             p_e = m
-
     else:
-        s_e = a @ s + h  # 3x1
-        p_e = a @ p @ a.T + m  # 3x3 @ 3x1 @ 3x3 = 3x3
+        s_e = a @ s + h
+        p_e = a @ p @ a.T + m
 
     s_old = s
     p_old = p
-    # c @ p_e @ c.T = 4x3 @ 3x3 @ 3x4 = 4x4
-    # d @ u @ d.T = 4x4 @ 4x4 @ 4x4 = 4x4
-    # p_e @ c.T @ inv... = 3x3 @ 3x4 @ 4x4 = 3x4
 
-    K = p_e @ c.T @ np.linalg.inv((c @ p_e @ c.T) + (d @ u @ d.T) + R)  # 3x4
-
-    # c @ s_e = 4x3 @ 3x1 = 4x1
-    # d @ hc = 4x4 @ 4x1 = 4x1
-    # K @ ... = 3x4 @ 4x1 = 3x1
-    s = s_e + K @ (z_r - (c @ s_e) - (d @ hc))  # 3x1
-
-    # d @ u @ d.T = 4x4 @ 4x4 @ 4x4 = 4x4
-    # c.T @ .. @ c = 3x4 @ 4x4 @ 4x3 = 3x3
+    K = p_e @ c.T @ np.linalg.inv((c @ p_e @ c.T) + (d @ u @ d.T) + R)
+    s = s_e + K @ (z_r - (c @ s_e) - (d @ hc))
     p = np.linalg.inv(np.linalg.inv(p_e) + c.T @ np.linalg.inv(d @ u @ d.T + R) @ c)  # 3x3
 
     z_c = s[0]
@@ -88,7 +77,6 @@ def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian, model = False):
     # return only s and p values for data here, lag values etc are done in training code.
     return z_c, dz, p, [s, p]
 
-# !ls '/content/drive/My Drive/SJSU/Final Project/model_state.h5'
 class Shape:
     def __init__(self, function):
         p = params.Params()
@@ -250,33 +238,6 @@ class MotionControlModel:
         lagWindowSize = self.lagWindowSize
         numFeaturesState = self.numFeaturesState
         numFeaturesStateAdded = self.numFeaturesStateAdded
-
-        # if learn:
-        #     #Skip data while not on shape
-        #     # calculate summary statistics
-        #     data = unscaled_data[:,0]
-        #     data_mean, data_std = np.mean(data), np.std(data)
-        #     # identify outliers
-        #     cut_off = data_std * 3
-        #     lower, upper = data_mean - cut_off, data_mean + cut_off
-        #     # identify outliers
-        #     onShape = 0
-        #     for value in data:
-        #         if value < lower or value > upper:
-        #             onShape = onShape + 1
-        #         else:
-        #             break
-        #     # Instead of removing, add a parameter - holiday effect.
-        #     # unscaled_data = unscaled_data[onShape:,:]
-        #     datalength = unscaled_data.shape[0]
-        #     onShape = np.array([*np.zeros((onShape)), *np.ones((datalength-onShape))])
-        #     onShape = np.reshape(onShape, (datalength, 1))
-        #     unscaled_data = np.hstack((unscaled_data[:,0:numFeaturesState], onShape, unscaled_data[:,numFeaturesState:]))
-        # else:
-        #     onShape = np.array([[1]])
-        #     unscaled_data = np.hstack(
-        #         (unscaled_data[:, 0:numFeaturesState], onShape, unscaled_data[:, numFeaturesState:]))
-
         datalength = unscaled_data.shape[0]
 
         if learn:
@@ -335,12 +296,10 @@ class MotionControlModel:
         shapesData = pkl.load(open('shapesData.p', 'rb'))
         model = False
         validationData = shapesData["elipse_1"]
-        # validationData = validationData.iloc[::1, :]
 
         for name in trainFunctions:
             value = shapesData[name]
             print("Training State for {} shape".format(name))
-            # value = value.iloc[::1, :]
             model = self.trainShape(value, validationData, model)
 
     def load(self):
@@ -349,11 +308,8 @@ class MotionControlModel:
         model = self.createModel(batch_size=1, stateful=True)
         # Transfer learned weights
         model.set_weights(model_orig.get_weights())
-        # model.compile(loss='mse', optimizer='adam')
-
         self.model = model
         self.scaler = pkl.load(open("scaler.p", "rb"))
-
 
     def predict(self, data):
         s, p = data
@@ -407,11 +363,10 @@ class Experiment:
         for shape in allShapes:
             data, _ = shape.trace()
             shapesData = shapesData.append(pd.Series({shape.name: data}))
-        # pkl.dump(shapesData, open("shapesData.p", "wb"))
+        pkl.dump(shapesData, open("shapesData.p", "wb"))
 
     def train(self):
         shapesData = pkl.load(open("shapesData.p", "rb"))
-        # trainShapes = ['irregular2_1', 'irregular1_1', 'irregular1_8', 'circle_6_1', 'circle_4_1']
         trainShapes = ['circle_4_1', 'circle_6_1', 'irregular1_1',
              'irregular2_1', 'irregular1_9', 'circle_4_8',
              'circle_3',
@@ -424,7 +379,6 @@ class Experiment:
 
     def test(self):
         shapesData = pkl.load(open("shapesData.p", "rb"))
-        # testNames = ['circle_1', 'irregular2_8', 'elipse_1'
         testNames = ['circle_1', 'circle_4_1', 'circle_6_1', 'elipse_1', 'irregular1_1',
              'irregular2_1', 'irregular1_9', 'circle_4_8',
              'elipse_6', 'irregular2_8', 'elipse_9', 'elipse_8', 'circle_3',
