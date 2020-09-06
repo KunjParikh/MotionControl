@@ -57,9 +57,10 @@ def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian, model = False):
 
 
     if model:
-        s_e, p_e = model.predict([s,p])
-        if (p_e == np.zeros((3,3))).flatten().all():
-            p_e = m
+        s_e = model.predict([s,p])
+        # if (p_e == np.zeros((3,3))).flatten().all():
+        #     p_e = m
+        p_e = m
     else:
         s_e = a @ s + h
         p_e = a @ p @ a.T + m
@@ -69,7 +70,8 @@ def kalmanFilter(z_c, dz, r, z_r, r_c, r_c_old, p, hessian, model = False):
 
     K = p_e @ c.T @ np.linalg.inv((c @ p_e @ c.T) + (d @ u @ d.T) + R)
     s = s_e + K @ (z_r - (c @ s_e) - (d @ hc))
-    p = np.linalg.inv(np.linalg.inv(p_e) + c.T @ np.linalg.inv(d @ u @ d.T + R) @ c)  # 3x3
+    # p = np.linalg.inv(np.linalg.inv(p_e) + c.T @ np.linalg.inv(d @ u @ d.T + R) @ c)  # 3x3
+    p = p_e
 
     z_c = s[0]
     dz = s[1:]
@@ -197,7 +199,8 @@ class MotionControlModel:
         self.numFeaturesState = 3
         self.numFeaturesError = 9
         self.lagWindowSize = 50
-        self.history = np.zeros((self.lagWindowSize, self.numFeaturesStateAdded+self.numFeaturesError)).tolist()
+        # self.history = np.zeros((self.lagWindowSize, self.numFeaturesStateAdded+self.numFeaturesError)).tolist()
+        self.history = np.zeros((self.lagWindowSize, self.numFeaturesStateAdded)).tolist()
 
         self.lstmStateSize = 40
         self.lstmErrorSize = 20
@@ -212,17 +215,14 @@ class MotionControlModel:
         numFeaturesError = self.numFeaturesError
         input1 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesStateAdded))
         lstm1 = LSTM(self.lstmStateSize, stateful=stateful)(input1)
-        # lstm1 = LSTM(self.lstmStateSize, stateful=stateful, return_sequences=True)(input1)
-        # lstm3 = LSTM(self.lstmStateSize, stateful=stateful)(lstm1)
         output1 = Dense(numFeaturesState, name='dense_state')(lstm1)
 
-        input2 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesError))
-        # lstm2 = LSTM(self.lstmErrorSize, stateful=stateful, return_sequences=True)(input2)
-        lstm2 = LSTM(self.lstmErrorSize, stateful=stateful)(input2)
-        # lstm4 = LSTM(self.lstmErrorSize, stateful=stateful)(lstm2)
-        output2 = Dense(numFeaturesError, name='dense_error')(lstm2)
+        # input2 = Input(batch_shape=(batch_size, lagWindowSize, numFeaturesError))
+        # lstm2 = LSTM(self.lstmErrorSize, stateful=stateful)(input2)
+        # output2 = Dense(numFeaturesError, name='dense_error')(lstm2)
 
-        model = Model(inputs=[input1, input2], outputs=[output1, output2])
+        # model = Model(inputs=[input1, input2], outputs=[output1, output2])
+        model = Model(inputs=[input1], outputs=[output1])
         return model
 
     def processData(self, df, learn=True):
@@ -230,10 +230,7 @@ class MotionControlModel:
             raw_data = df.to_numpy()
         else:
             raw_data = df
-        unscaled_data = np.array([[x[0][0], x[0][1], x[0][2],
-                            x[1][0][0], x[1][0][1], x[1][0][2], x[1][1][0], x[1][1][1], x[1][1][2], x[1][2][0],
-                            x[1][2][1], x[1][2][2]
-                            ] for x in raw_data])
+        unscaled_data = np.array([[x[0][0], x[0][1], x[0][2]] for x in raw_data])
 
         lagWindowSize = self.lagWindowSize
         numFeaturesState = self.numFeaturesState
@@ -243,7 +240,8 @@ class MotionControlModel:
         if learn:
             scaler = MinMaxScaler(feature_range=(-1, 1))
             scaled_data = scaler.fit_transform(unscaled_data)
-            pkl.dump(scaler, open("scaler.p", "wb"))
+            rootpath = "/tmp" if os.name == 'posix' else ""
+            pkl.dump(scaler, open(os.path.join(rootpath, "scaler.p"), "wb"))
         else:
             self.history.append(unscaled_data[0])
             self.history = self.history[1:]
@@ -253,14 +251,12 @@ class MotionControlModel:
         if learn:
             X = np.array([scaled_data[i-lagWindowSize:i,:] for i in range(lagWindowSize, datalength)])
             Y = scaled_data[lagWindowSize:,:]
-            X = [X[:, :, 0:numFeaturesStateAdded], X[:, :, numFeaturesStateAdded:]]
             # We dont need 4th parameter for prediction so -1
-            Y = [Y[:, 0:numFeaturesState], Y[:, numFeaturesStateAdded:]]
+            # Y = [Y[:, 0:numFeaturesState], Y[:, numFeaturesStateAdded:]]
         else:
             X = np.array([scaled_data])
-            X = [X[:, :, 0:numFeaturesStateAdded], X[:, :, numFeaturesStateAdded:]]
+            # X = [X[:, :, 0:numFeaturesStateAdded], X[:, :, numFeaturesStateAdded:]]
             Y = False
-
         return X, Y
 
     def trainShape(self, dataset, validationData, model=False):
@@ -268,27 +264,36 @@ class MotionControlModel:
         vX, vY = self.processData(validationData)
 
         batch_size = 60
-        bs = floor(X[0].shape[0] / batch_size) * batch_size
-        X = [X[0][:bs,:,:], X[1][:bs,:,:]]
-        Y = [Y[0][:bs, :], Y[1][:bs, :]]
+        # bs = floor(X[0].shape[0] / batch_size) * batch_size
+        bs = floor(X.shape[0] / batch_size) * batch_size
+        # X = [X[0][:bs,:,:], X[1][:bs,:,:]]
+        # Y = [Y[0][:bs, :], Y[1][:bs, :]]
+        X = X[:bs, :, :]
+        Y = Y[:bs, :]
 
-        vX = [vX[0][:bs, :, :], vX[1][:bs, :, :]]
-        vY = [vY[0][:bs, :], vY[1][:bs, :]]
+        # vX = [vX[0][:bs, :, :], vX[1][:bs, :, :]]
+        # vY = [vY[0][:bs, :], vY[1][:bs, :]]
+        vX = vX[:bs, :, :]
+        vY = vY[:bs, :]
 
         if model == False:
             model = self.createModel(batch_size=batch_size, stateful=True)
             model.compile(loss='mse', optimizer='adam')
             plot_model(model, show_shapes=True, to_file='model.png')
 
-        es = EarlyStopping(monitor='val_dense_state_loss', mode='min', verbose=1, patience=40)
+        es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=40)
         mc = ModelCheckpoint(os.path.join(self.rootpath, "model.h5"),
-            monitor='val_dense_state_loss', mode='min', verbose=1, save_best_only=True)
+            monitor='val_loss', mode='min', verbose=1, save_best_only=True)
         rs = LambdaCallback(on_epoch_end=lambda epoch, logs: model.reset_states())
+        # history = model.fit(X, Y, epochs=200, batch_size=batch_size, verbose=2, callbacks=[es, mc, rs], shuffle=False,
+        #                     validation_data=(vX, vY))
         history = model.fit(X, Y, epochs=200, batch_size=batch_size, verbose=2, callbacks=[es, mc, rs], shuffle=False,
                             validation_data=(vX, vY))
 
         trainPredict = model.predict(X, batch_size = batch_size)
-        trainScore = [sqrt(x) for x in  mean_squared_error(np.hstack(Y), np.hstack(trainPredict), multioutput='raw_values')]
+        # trainScore = [sqrt(x) for x in  mean_squared_error(np.hstack(Y), np.hstack(trainPredict), multioutput='raw_values')]
+        trainScore = [sqrt(x) for x in
+                      mean_squared_error(Y, trainPredict, multioutput='raw_values')]
         print("Train Score: {} RMSE".format(trainScore))
         return model
 
@@ -317,17 +322,17 @@ class MotionControlModel:
 
         X, Y = self.processData([data], learn=False)
         scaled_predict = self.model.predict(X, batch_size = 1)
-        if self.numFeaturesStateAdded > self.numFeaturesState:
-            scaled_predict = np.hstack((scaled_predict[0], [[1]], scaled_predict[1]))
-        else:
-            scaled_predict = np.hstack((scaled_predict[0], scaled_predict[1]))
+        # if self.numFeaturesStateAdded > self.numFeaturesState:
+        #     scaled_predict = np.hstack((scaled_predict[0], [[1]], scaled_predict[1]))
+        # else:
+        #     scaled_predict = np.hstack((scaled_predict[0], scaled_predict[1]))
         predict = self.scaler.inverse_transform(scaled_predict)[0]
 
         s_e = predict[0:self.numFeaturesState]
-        p_e = predict[self.numFeaturesStateAdded:]
-        p_e = np.reshape(p_e, (3, 3))
+        # p_e = predict[self.numFeaturesStateAdded:]
+        # p_e = np.reshape(p_e, (3, 3))
 
-        return s_e, p_e
+        return s_e
 
     def evaluate(self, functionNames):
         shapesData = pkl.load(open('shapesData.p', 'rb'))
@@ -335,16 +340,16 @@ class MotionControlModel:
             dataset = shapesData[name].to_numpy()
             trainPredict = []
             for x in dataset:
-                s_e, p_e = self.predict(x)
+                s_e = self.predict(x)
                 # s_e, p_e = x
-                trainPredict.append([s_e, p_e])
+                trainPredict.append([s_e])
 
             #Score
             dataset = dataset[1:] #Shift by one.
             trainPredict = trainPredict[:-1] # Cant score last prediction
 
-            dataset = [[*x[0], *x[1].flatten()] for x in dataset]
-            trainPredict = [[*x[0], *x[1][0], *x[1][1], *x[1][2]] for x in trainPredict]
+            # dataset = [[*x[0], *x[1].flatten()] for x in dataset]
+            # trainPredict = [[*x[0], *x[1][0], *x[1][1], *x[1][2]] for x in trainPredict]
 
             trainScore = [sqrt(x) for x in
                           mean_squared_error(dataset, trainPredict, multioutput='raw_values')]
@@ -357,13 +362,20 @@ class Experiment:
 
     def collect(self):
         shapesData = pd.Series(dtype='object')
-        allNames = ['elipse_1']
+        allNames = ['circle_1', 'circle_4_1', 'circle_6_1', 'elipse_1', 'irregular1_1',
+             'irregular2_1', 'irregular1_9', 'circle_4_8',
+             'elipse_6', 'irregular2_8', 'elipse_9', 'elipse_8', 'circle_3',
+             'elipse_2', 'circle_4', 'elipse_5', 'circle_7', 'elipse_3',
+             'irregular2_2', 'circle_6', 'irregular1_8', 'circle_10', 'circle_4_7',
+             'circle_2', 'circle_6_8']
+        # allNames = ['elipse_1']
         fg = params.FunctionGenerator()
         allShapes = [Shape(fg.getFunction(name)) for name in allNames]
         for shape in allShapes:
             data, _ = shape.trace()
             shapesData = shapesData.append(pd.Series({shape.name: data}))
-        pkl.dump(shapesData, open("shapesData.p", "wb"))
+        rootpath = "/tmp" if os.name == 'posix' else ""
+        pkl.dump(shapesData, open(os.path.join(rootpath, "shapesData.p"), "wb"))
 
     def train(self):
         shapesData = pkl.load(open("shapesData.p", "rb"))
@@ -373,7 +385,7 @@ class Experiment:
              'circle_4', 'circle_7',
              'irregular2_2', 'circle_6', 'irregular1_8', 'circle_10', 'circle_4_7',
              'circle_2', 'circle_6_8']
-        trainShapes = ['elipse_1']
+        # trainShapes = ['elipse_1']
         model = MotionControlModel()
         model.train(trainShapes)
 
