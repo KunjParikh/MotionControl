@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 import params
 from formationCenter import formationCenter
 from formationControl import formationControl
@@ -17,7 +19,9 @@ import math as math
 import os as os
 from keras.models import load_model
 import utils as utils
-pltVar = utils.PlotVariable("testVar")
+import shutil
+# pltVar = utils.PlotVariable("testVar")
+from numpy.linalg import norm
 
 #We cant model hessian as just function of r_c, we need z_r to account for different shapes.
 #Matlab code uses: r_c, z_c, dz_c, r, z_r, hessian.
@@ -35,7 +39,7 @@ class Hessian:
         q, dq, u_r, vel_q = p.q, p.dq, p.u_r, p.vel_q
         trainData, model = False, False
         if collect:
-            trainData = pd.DataFrame()
+            trainData = []
         if test:
             model_orig = load_model("hessian.h5")
             scaler = pkl.load(open("hessian_scaler.p", "rb"))
@@ -54,6 +58,7 @@ class Hessian:
 
         hessian = function.hessian_f(r_c[0], r_c[1])
         z_c = function.f(r_c[0], r_c[1])
+        dz_c = function.dz_f(r_c[0], r_c[1])
         y_2 = dz_c / norm(dz_c)
         x_2 = p.rotateRight @ y_2
 
@@ -72,15 +77,15 @@ class Hessian:
             z_r = np.array([function.f(*pt) for pt in r])
             # hessian = [[0, 0], [0, 0]]
             r_c, x_2, y_2 = formationCenter(r_c, z_c, dz_c, hessian, x_2, y_2, function.mu_f, function.z_desired)
-            r, q, dq, u_r, vel_q = formationControl(r_c, r, q, dq, u_r, vel_q)
+            r, q, dq, u_r, vel_q = formationControl(r_c, r, dz_c, q, dq, u_r, vel_q, i)
             state = np.concatenate([r_c, [z_c], dz_c, *r, z_r, *hessian])
             if collect:
-                trainData = trainData.append(pd.Series(state, ignore_index=True))
+                trainData.append(state)
             if test:
                 state = scaler.transform(state.reshape(1,-1))
                 hessian = model.predict(np.reshape(state, (state.shape[0], 1, state.shape[1])),
                                                     batch_size=1)[0].reshape(2,2)
-            pltVar.push(hessian[0,0])
+            # pltVar.push(hessian[0][0])
             if plot:
                 r_c_plot.append(r_c)
                 if i % 150 == 0:
@@ -98,9 +103,13 @@ class Hessian:
                 plt.plot([r[0, 0], r[1, 0]], [r[0, 1], r[1, 1]], 'yo-')
                 plt.plot([r[2, 0], r[3, 0]], [r[2, 1], r[3, 1]], 'go-')
             plt.title(function.name)
-            plt.show()
-        pltVar.plot()
+            # plt.show()
+            plt.savefig("{}_hessianEstimation.pdf".format(function.name), bbox_inches='tight')
+            plt.close()
+        # pltVar.plot()
 
+        if collect:
+            trainData = pd.DataFrame(trainData)
         print("Finished stepping through function: {}\n".format(function.name))
         if test:
             print("Hessian error is: {}".format(math.sqrt(mean_squared_error(realHessian, predictedHessians))))
@@ -120,7 +129,7 @@ class Hessian:
         p = params.Params()
         data = pkl.load(open('hessian_data.p', 'rb'))
         nfeatures = 21
-        rootpath = ""
+        rootpath = "/tmp/"
         scaler = MinMaxScaler(feature_range=(-1, 1))
         model = Sequential()
         model.add(LSTM(nfeatures+1, batch_input_shape=(p.batch_size, 1, nfeatures), stateful=True))
@@ -150,13 +159,15 @@ class Hessian:
             trainScore = math.sqrt(mean_squared_error(trainY, trainPredict))
             print("Train Score: {} RMSE".format(trainScore))
 
+        shutil.copyfile(os.path.join(rootpath, "hessian.h5"), "/home/012532065/final/MotionControl/hessian.h5")
+
     def test(self):
         p = params.Params()
-        for function in p.test_functions:
+        for function in p.functions:
             self.stepFunction(function, test=True, plot=True)
 
 if True or __name__ == "__main__":
     hessian = Hessian()
-    #hessian.collect()
-    #hessian.train()
+    hessian.collect()
+    hessian.train()
     hessian.test()
